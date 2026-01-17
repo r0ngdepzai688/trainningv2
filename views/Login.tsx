@@ -19,7 +19,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, onRegister }) => {
   const [regId, setRegId] = useState('');
   const [regPart, setRegPart] = useState('');
   const [regGroupOrCompany, setRegGroupOrCompany] = useState('');
-  const [regCompanyType, setRegCompanyType] = useState<CompanyType>('sev');
+  // Fix: Constraint type to 'sev' | 'vendor' because 'target' is not a valid User company type
+  const [regCompanyType, setRegCompanyType] = useState<'sev' | 'vendor'>('sev');
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();

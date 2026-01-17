@@ -49,7 +49,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       <main className="flex-1 overflow-y-auto pb-24 px-4 py-6">
         <div className="max-w-4xl mx-auto">
-          {activeTab === 0 && <CreateCourseTab onAdd={onAddCourse} onBulkAddUsers={onBulkAddUsers} />}
+          {activeTab === 0 && (
+            <CreateCourseTab 
+              onAdd={onAddCourse} 
+              onBulkAddUsers={onBulkAddUsers} 
+              onSuccess={() => setActiveTab(1)} 
+            />
+          )}
           {activeTab === 1 && (
             <ActingCoursesTab 
               courses={state.courses} 

@@ -6,9 +6,10 @@ import { DEFAULT_PASSWORD } from '../../constants';
 interface CreateCourseTabProps {
   onAdd: (c: Omit<Course, 'id' | 'completions'>) => void;
   onBulkAddUsers: (users: User[]) => void;
+  onSuccess?: () => void;
 }
 
-const CreateCourseTab: React.FC<CreateCourseTabProps> = ({ onAdd, onBulkAddUsers }) => {
+const CreateCourseTab: React.FC<CreateCourseTabProps> = ({ onAdd, onBulkAddUsers, onSuccess }) => {
   const [name, setName] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
@@ -39,7 +40,6 @@ const CreateCourseTab: React.FC<CreateCourseTabProps> = ({ onAdd, onBulkAddUsers
           const part = row.part || row.Part || row["Bộ phận"];
           const group = row.group || row.Group || row["Nhóm"] || row.Company || row["Công ty"];
           
-          // Determine if it's SEV or Vendor based on ID length or a 'Company' column
           const company: 'sev' | 'vendor' = (id.length === 8) ? 'sev' : 'vendor';
 
           if (name && id && id !== "undefined") {
@@ -73,12 +73,10 @@ const CreateCourseTab: React.FC<CreateCourseTabProps> = ({ onAdd, onBulkAddUsers
       return;
     }
 
-    // 1. If Target, ensure users are in the system DB
     if (target === 'target') {
       onBulkAddUsers(targetUsers);
     }
 
-    // 2. Add the course
     onAdd({
       name,
       start,
@@ -91,13 +89,16 @@ const CreateCourseTab: React.FC<CreateCourseTabProps> = ({ onAdd, onBulkAddUsers
 
     alert('Khóa học đã được tạo thành công!');
     
-    // Reset form
     setName('');
     setStart('');
     setEnd('');
     setContent('');
     setTargetUsers([]);
     if (fileInputRef.current) fileInputRef.current.value = '';
+
+    if (onSuccess) {
+      onSuccess();
+    }
   };
 
   return (
