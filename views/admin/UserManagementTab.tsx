@@ -1,15 +1,16 @@
 
 import React, { useState, useRef } from 'react';
-import { User, CompanyType } from '../../types';
+import { User, CompanyType, Course, CourseStatus } from '../../types';
 import { DEFAULT_PASSWORD } from '../../constants';
 
 interface UserManagementTabProps {
   users: User[];
+  courses?: Course[];
   onDelete: (id: string) => void;
-  onAdd: (u: User) => void;
+  onAdd: (u: User, assignedCourseIds?: string[]) => void;
 }
 
-const UserManagementTab: React.FC<UserManagementTabProps> = ({ users, onDelete, onAdd }) => {
+const UserManagementTab: React.FC<UserManagementTabProps> = ({ users, courses = [], onDelete, onAdd }) => {
   const [subTab, setSubTab] = useState<CompanyType>('sev');
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -21,6 +22,30 @@ const UserManagementTab: React.FC<UserManagementTabProps> = ({ users, onDelete, 
   const [newId, setNewId] = useState('');
   const [newPart, setNewPart] = useState('');
   const [newGroupOrCompany, setNewGroupOrCompany] = useState('');
+  const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
+
+  const getCourseStatus = (course: Course): CourseStatus => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(course.start);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(course.end);
+    end.setHours(0, 0, 0, 0);
+    
+    const assignedIds = new Set(course.assignedUserIds || []);
+    const targetUsers = users.filter(u => assignedIds.has(u.id));
+    const isFinished = targetUsers.length > 0 && course.completions.length === targetUsers.length;
+
+    if (isFinished || today > end) return 'Finished';
+    if (today < start) return 'Plan';
+    return 'Opening';
+  };
+
+  const activeAssignCourses = courses.filter(c => {
+    const status = getCourseStatus(c);
+    // LOGIC FIX: Exclude 'Finished' AND exclude 'Target' courses for manual assignment of new users
+    return status !== 'Finished' && c.target !== 'target';
+  });
 
   const filteredUsers = users.filter(u => 
     u.company === subTab && 
@@ -31,12 +56,11 @@ const UserManagementTab: React.FC<UserManagementTabProps> = ({ users, onDelete, 
     e.preventDefault();
     
     if (subTab === 'sev' && newId.length !== 8) {
-      // In a real app, we'd use a custom Toast/Alert here too
-      console.warn('id SEV phải đủ 8 số.');
+      alert('ID nhân viên SEV phải đủ 8 số.');
       return;
     }
     if (subTab === 'vendor' && newId.length !== 12) {
-      console.warn('CCCD phải đủ 12 số.');
+      alert('CCCD phải đủ 12 số.');
       return;
     }
 
@@ -48,7 +72,7 @@ const UserManagementTab: React.FC<UserManagementTabProps> = ({ users, onDelete, 
       company: subTab as 'sev' | 'vendor',
       role: 'user',
       password: DEFAULT_PASSWORD
-    });
+    }, selectedCourseIds);
 
     setShowAddModal(false);
     resetForm();
@@ -59,6 +83,13 @@ const UserManagementTab: React.FC<UserManagementTabProps> = ({ users, onDelete, 
     setNewId('');
     setNewPart('');
     setNewGroupOrCompany('');
+    setSelectedCourseIds([]);
+  };
+
+  const toggleCourseSelection = (courseId: string) => {
+    setSelectedCourseIds(prev => 
+      prev.includes(courseId) ? prev.filter(id => id !== courseId) : [...prev, courseId]
+    );
   };
 
   const formatPart = (part: string) => {
@@ -87,7 +118,6 @@ const UserManagementTab: React.FC<UserManagementTabProps> = ({ users, onDelete, 
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
 
-        let count = 0;
         data.forEach((row: any) => {
           const name = row.name || row.Name || row["Họ tên"];
           const id = String(row.id || row.ID || row["Mã số"] || row["CCCD"]);
@@ -104,13 +134,14 @@ const UserManagementTab: React.FC<UserManagementTabProps> = ({ users, onDelete, 
               role: 'user',
               password: DEFAULT_PASSWORD
             });
-            count++;
           }
         });
 
         if (fileInputRef.current) fileInputRef.current.value = '';
+        alert('Đã nhập danh sách nhân viên từ Excel thành công.');
       } catch (err) {
         console.error(err);
+        alert('Lỗi đọc file Excel.');
       }
     };
     reader.readAsBinaryString(file);
@@ -278,7 +309,7 @@ const UserManagementTab: React.FC<UserManagementTabProps> = ({ users, onDelete, 
             
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight">Thêm {subTab === 'sev' ? 'Nhân viên SEV' : 'Nhà cung cấp'}</h2>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-300 hover:text-slate-800 text-2xl p-2 transition-colors">✕</button>
+              <button onClick={() => { setShowAddModal(false); resetForm(); }} className="text-slate-300 hover:text-slate-800 text-2xl p-2 transition-colors">✕</button>
             </div>
 
             <form onSubmit={handleAddUser} className="space-y-4 overflow-y-auto flex-1 pb-10 scrollbar-hide">
@@ -334,10 +365,40 @@ const UserManagementTab: React.FC<UserManagementTabProps> = ({ users, onDelete, 
                 />
               </div>
 
+              {/* Assignment Section */}
+              <div className="space-y-3 pt-2">
+                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Gán khóa đào tạo hiện có</p>
+                <div className="grid grid-cols-1 gap-2">
+                   {activeAssignCourses.length > 0 ? (
+                     activeAssignCourses.map(c => (
+                       <label 
+                         key={c.id} 
+                         className={`flex items-center gap-3 p-4 rounded-2xl border transition-all cursor-pointer ${
+                           selectedCourseIds.includes(c.id) ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'
+                         }`}
+                       >
+                         <input 
+                           type="checkbox" 
+                           className="w-5 h-5 rounded border-slate-300 text-blue-600"
+                           checked={selectedCourseIds.includes(c.id)}
+                           onChange={() => toggleCourseSelection(c.id)}
+                         />
+                         <div className="flex-1">
+                           <p className="text-[11px] font-bold text-slate-800 leading-tight">{c.name}</p>
+                           <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">Hạn: {c.end}</p>
+                         </div>
+                       </label>
+                     ))
+                   ) : (
+                     <p className="text-[10px] text-slate-400 italic bg-slate-50 p-4 rounded-2xl border border-slate-100">Không có khóa học nào đang hoạt động để gán.</p>
+                   )}
+                </div>
+              </div>
+
               <div className="flex gap-4 pt-6 safe-area-bottom">
                 <button 
                   type="button" 
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => { setShowAddModal(false); resetForm(); }}
                   className="flex-1 py-4 bg-slate-50 text-slate-400 rounded-2xl font-bold uppercase tracking-widest text-[10px] active:bg-slate-100 transition-colors"
                 >
                   Hủy bỏ

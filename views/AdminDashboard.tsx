@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { AppState, Course, User } from '../types';
+import { AppState, Course, User, CourseException } from '../types';
 import CreateCourseTab from './admin/CreateCourseTab';
 import ActingCoursesTab from './admin/ActingCoursesTab';
 import FinishedCoursesTab from './admin/FinishedCoursesTab';
@@ -15,11 +15,14 @@ interface AdminDashboardProps {
   onDeleteCourse: (id: string) => void;
   onToggleCourseActive: (id: string) => void;
   onDeleteUser: (id: string) => void;
-  onAddUser: (u: User) => void;
+  onAddUser: (u: User, courseIds?: string[]) => void;
+  onAddException: (courseId: string, exception: CourseException) => void;
+  onRemoveException: (courseId: string, userId: string) => void;
+  onPushReminder: (courseId: string) => void;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-  state, onLogout, onAddCourse, onBulkAddUsers, onUpdateCourse, onDeleteCourse, onToggleCourseActive, onDeleteUser, onAddUser
+  state, onLogout, onAddCourse, onBulkAddUsers, onUpdateCourse, onDeleteCourse, onToggleCourseActive, onDeleteUser, onAddUser, onAddException, onRemoveException, onPushReminder
 }) => {
   const [activeTab, setActiveTab] = useState(1);
 
@@ -51,6 +54,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="max-w-4xl mx-auto">
           {activeTab === 0 && (
             <CreateCourseTab 
+              allUsers={state.users}
               onAdd={onAddCourse} 
               onBulkAddUsers={onBulkAddUsers} 
               onSuccess={() => setActiveTab(1)} 
@@ -63,12 +67,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               onUpdate={onUpdateCourse}
               onDelete={onDeleteCourse}
               onToggle={onToggleCourseActive}
+              onAddException={onAddException}
+              onRemoveException={onRemoveException}
+              onPushReminder={onPushReminder}
             />
           )}
           {activeTab === 2 && <FinishedCoursesTab courses={state.courses} users={state.users} />}
           {activeTab === 3 && (
             <UserManagementTab 
               users={state.users} 
+              courses={state.courses}
               onDelete={onDeleteUser}
               onAdd={onAddUser}
             />

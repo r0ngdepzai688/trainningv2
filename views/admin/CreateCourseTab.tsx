@@ -4,12 +4,13 @@ import { Course, CompanyType, User } from '../../types';
 import { DEFAULT_PASSWORD } from '../../constants';
 
 interface CreateCourseTabProps {
+  allUsers: User[];
   onAdd: (c: Omit<Course, 'id' | 'completions'>) => void;
   onBulkAddUsers: (users: User[]) => void;
   onSuccess?: () => void;
 }
 
-const CreateCourseTab: React.FC<CreateCourseTabProps> = ({ onAdd, onBulkAddUsers, onSuccess }) => {
+const CreateCourseTab: React.FC<CreateCourseTabProps> = ({ allUsers, onAdd, onBulkAddUsers, onSuccess }) => {
   const [name, setName] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
@@ -33,21 +34,23 @@ const CreateCourseTab: React.FC<CreateCourseTabProps> = ({ onAdd, onBulkAddUsers
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
 
-        const imported: User[] = [];
+        // LOGIC FIX: Use a Map to ensure unique IDs from the Excel file
+        const uniqueImportedMap = new Map<string, User>();
+        
         data.forEach((row: any) => {
-          const name = row.name || row.Name || row["Họ tên"];
-          const id = String(row.id || row.ID || row["Mã số"] || row["CCCD"]);
-          const part = row.part || row.Part || row["Bộ phận"];
-          const group = row.group || row.Group || row["Nhóm"] || row.Company || row["Công ty"];
+          const nameValue = row.name || row.Name || row["Họ tên"];
+          const idValue = String(row.id || row.ID || row["Mã số"] || row["CCCD"]);
+          const partValue = row.part || row.Part || row["Bộ phận"];
+          const groupValue = row.group || row.Group || row["Nhóm"] || row.Company || row["Công ty"];
           
-          const company: 'sev' | 'vendor' = (id.length === 8) ? 'sev' : 'vendor';
+          const company: 'sev' | 'vendor' = (idValue.length === 8) ? 'sev' : 'vendor';
 
-          if (name && id && id !== "undefined") {
-            imported.push({
-              name,
-              id,
-              part: part || "N/A",
-              group: group || 'N/A',
+          if (nameValue && idValue && idValue !== "undefined") {
+            uniqueImportedMap.set(idValue, {
+              name: nameValue,
+              id: idValue,
+              part: partValue || "N/A",
+              group: groupValue || 'N/A',
               company: company,
               role: 'user',
               password: DEFAULT_PASSWORD
@@ -55,8 +58,29 @@ const CreateCourseTab: React.FC<CreateCourseTabProps> = ({ onAdd, onBulkAddUsers
           }
         });
 
+        const imported = Array.from(uniqueImportedMap.values());
+
+        if (imported.length === 0) {
+          alert('File Excel không có dữ liệu hợp lệ.');
+          return;
+        }
+
+        // Check if all imported users exist in the system's user database
+        const existingIds = new Set(allUsers.map(u => u.id));
+        const missingUsers = imported.filter(u => !existingIds.has(u.id));
+
+        if (missingUsers.length > 0) {
+          const missingNames = missingUsers.slice(0, 3).map(u => `${u.name} (${u.id})`).join(', ');
+          const suffix = missingUsers.length > 3 ? ` và ${missingUsers.length - 3} người khác` : '';
+          alert(`Nhân viên không tồn tại, hãy đăng kí trước:\n${missingNames}${suffix}`);
+          
+          setTargetUsers([]);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
+
         setTargetUsers(imported);
-        alert(`Đã nhận danh sách ${imported.length} nhân viên từ file Excel.`);
+        alert(`Đã nhận danh sách ${imported.length} nhân viên (duy nhất) từ file Excel.`);
       } catch (err) {
         console.error(err);
         alert('Lỗi đọc file Excel. Vui lòng kiểm tra lại định dạng (name, id, part, group).');
@@ -68,12 +92,25 @@ const CreateCourseTab: React.FC<CreateCourseTabProps> = ({ onAdd, onBulkAddUsers
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (target === 'target' && targetUsers.length === 0) {
-      alert('Vui lòng import danh sách nhân viên cho đối tượng Target.');
-      return;
-    }
-
     if (target === 'target') {
+      if (targetUsers.length === 0) {
+        alert('Vui lòng import danh sách nhân viên cho đối tượng Target.');
+        return;
+      }
+
+      // Final safety validation before submission
+      const existingIds = new Set(allUsers.map(u => u.id));
+      const missingUsers = targetUsers.filter(u => !existingIds.has(u.id));
+
+      if (missingUsers.length > 0) {
+        const missingNames = missingUsers.slice(0, 3).map(u => `${u.name} (${u.id})`).join(', ');
+        const suffix = missingUsers.length > 3 ? ` và ${missingUsers.length - 3} người khác` : '';
+        alert(`Nhân viên không tồn tại, hãy đăng kí trước:\n${missingNames}${suffix}`);
+        return;
+      }
+      
+      // Since they already exist, we don't strictly need to re-add them to global users
+      // But we pass them to ensure the app state stays consistent
       onBulkAddUsers(targetUsers);
     }
 
@@ -83,7 +120,8 @@ const CreateCourseTab: React.FC<CreateCourseTabProps> = ({ onAdd, onBulkAddUsers
       end,
       content,
       target,
-      assignedUserIds: target === 'target' ? targetUsers.map(u => u.id) : undefined,
+      // Ensure unique list one last time using Set
+      assignedUserIds: target === 'target' ? Array.from(new Set(targetUsers.map(u => u.id))) : undefined,
       isActive
     });
 

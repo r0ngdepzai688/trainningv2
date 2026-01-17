@@ -11,19 +11,16 @@ const FinishedCoursesTab: React.FC<FinishedCoursesTabProps> = ({ courses, users 
   const getStatus = (course: Course): CourseStatus => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     const end = new Date(course.end);
     end.setHours(0, 0, 0, 0);
     
-    let targetUsers: User[] = [];
-    if (course.target === 'target') {
-      const assignedIds = new Set(course.assignedUserIds || []);
-      targetUsers = users.filter(u => assignedIds.has(u.id));
-    } else {
-      targetUsers = users.filter(u => u.company === (course.target === 'target' ? 'sev' : course.target) && u.role === 'user');
-    }
+    const assignedIds = new Set(course.assignedUserIds || []);
+    const exceptionIds = new Set((course.exceptions || []).map(e => e.userId));
+    
+    // Total users who actually need to sign
+    const targetUsers = users.filter(u => assignedIds.has(u.id) && !exceptionIds.has(u.id));
 
-    const isFinished = targetUsers.length > 0 && course.completions.length === targetUsers.length;
+    const isFinished = targetUsers.length > 0 && course.completions.length >= targetUsers.length;
 
     if (isFinished || today > end) return 'Finished';
     return 'Opening';
@@ -32,18 +29,16 @@ const FinishedCoursesTab: React.FC<FinishedCoursesTabProps> = ({ courses, users 
   const finishedCourses = courses.filter(c => getStatus(c) === 'Finished');
 
   const getStats = (course: Course) => {
-    let targetUsers: User[] = [];
-    if (course.target === 'target') {
-      const assignedIds = new Set(course.assignedUserIds || []);
-      targetUsers = users.filter(u => assignedIds.has(u.id));
-    } else {
-      targetUsers = users.filter(u => u.company === (course.target === 'target' ? 'sev' : course.target) && u.role === 'user');
-    }
+    const assignedIds = new Set(course.assignedUserIds || []);
+    const exceptionIds = new Set((course.exceptions || []).map(e => e.userId));
+    
+    // Headcount needed = Assigned - Exceptions
+    const targetUsersCount = users.filter(u => assignedIds.has(u.id) && !exceptionIds.has(u.id)).length;
 
     const signedCount = course.completions.length;
-    const totalCount = targetUsers.length;
-    const percentage = totalCount > 0 ? Math.round((signedCount / totalCount) * 100) : 0;
-    return { signedCount, totalCount, percentage };
+    const percentage = targetUsersCount > 0 ? Math.round((signedCount / targetUsersCount) * 100) : 100;
+    
+    return { signedCount, totalCount: targetUsersCount, percentage, exceptionsCount: exceptionIds.size };
   };
 
   return (
@@ -55,7 +50,7 @@ const FinishedCoursesTab: React.FC<FinishedCoursesTabProps> = ({ courses, users 
 
       <div className="grid grid-cols-1 gap-6">
         {finishedCourses.map((c) => {
-          const { signedCount, totalCount, percentage } = getStats(c);
+          const { signedCount, totalCount, percentage, exceptionsCount } = getStats(c);
 
           return (
             <div key={c.id} className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col transition-all active:scale-[0.995]">
@@ -70,6 +65,11 @@ const FinishedCoursesTab: React.FC<FinishedCoursesTabProps> = ({ courses, users 
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg">
                       {c.target === 'sev' ? 'SEV' : c.target === 'vendor' ? 'Vendor' : 'Target'}
                     </span>
+                    {exceptionsCount > 0 && (
+                      <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg bg-orange-50 text-orange-400">
+                        {exceptionsCount} vắng mặt
+                      </span>
+                    )}
                   </div>
                 </div>
 
