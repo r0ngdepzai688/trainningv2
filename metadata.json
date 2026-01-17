@@ -1,0 +1,7 @@
+{
+  "name": "IQC Training Pro",
+  "description": "A professional online training confirmation system for IQC inspectors, featuring automated course assignment, electronic signatures, and comprehensive administrative reporting.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
