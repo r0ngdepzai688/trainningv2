@@ -1,7 +1,7 @@
 
 {
   "name": "iqc-training-pro",
-  "version": "1.3.0",
+  "version": "1.5.0",
   "description": "Hệ thống xác nhận đào tạo IQC chuyên nghiệp",
   "main": "index.js",
   "dependencies": {
@@ -11,7 +11,7 @@
   },
   "scripts": {
     "clean-www": "if exist www (rmdir /s /q www)",
-    "build-app": "npm run clean-www && mkdir www && xcopy /Y index.html www\\ && xcopy /Y index.tsx www\\ && xcopy /Y App.tsx www\\ && xcopy /Y types.ts www\\ && xcopy /Y constants.tsx www\\ && xcopy /Y manifest.json www\\ && xcopy /Y metadata.json www\\ && xcopy /E /I /Y views www\\views && xcopy /E /I /Y components www\\components && xcopy /E /I /Y lib www\\lib && npx @capacitor/cli sync",
+    "build-app": "npm run clean-www && mkdir www && xcopy \"index.html\" \"www\\\" /Y && xcopy \"index.tsx\" \"www\\\" /Y && xcopy \"App.tsx\" \"www\\\" /Y && xcopy \"types.ts\" \"www\\\" /Y && xcopy \"constants.tsx\" \"www\\\" /Y && xcopy \"manifest.json\" \"www\\\" /Y && xcopy \"metadata.json\" \"www\\\" /Y && (if exist views xcopy \"views\" \"www\\views\" /E /I /Y) && (if exist components xcopy \"components\" \"www\\components\" /E /I /Y) && (if exist lib xcopy \"lib\" \"www\\lib\" /E /I /Y) && npx @capacitor/cli sync android",
     "open-studio": "npx @capacitor/cli open android",
     "re-add-android": "if exist android (rmdir /s /q android) && npx @capacitor/cli add android"
   },
