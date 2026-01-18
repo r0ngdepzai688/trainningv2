@@ -1,7 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { AppState, Course, Notification } from '../types';
+import { AppState, Course, Notification as AppNotification } from '../types';
 import SignaturePad from '../components/SignaturePad';
+// Fix: Import GoogleGenAI to add AI summary feature
+import { GoogleGenAI } from "@google/genai";
 
 interface UserDashboardProps {
   state: AppState;
@@ -16,6 +18,10 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ state, onLogout, onSign, 
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifPermission, setNotifPermission] = useState<string>(Notification.permission);
+  
+  // State for AI Summary
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
 
   const notifications = state.currentUser?.notifications || [];
   const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -43,12 +49,32 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ state, onLogout, onSign, 
     }
   };
 
+  // Function to generate AI summary
+  const generateSummary = async (content: string) => {
+    setIsSummarizing(true);
+    setAiSummary(null);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Hãy tóm tắt nội dung đào tạo sau đây thành 3 ý chính ngắn gọn, súc tích bằng tiếng Việt: \n\n${content}`,
+      });
+      setAiSummary(response.text || "Không thể tạo tóm tắt.");
+    } catch (error) {
+      console.error("Gemini summary failed:", error);
+      setAiSummary("Lỗi khi tạo tóm tắt. Vui lòng thử lại sau.");
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
   const handleSign = () => {
     if (!selectedCourse || !signatureData || !hasAgreed) return;
     onSign(selectedCourse.id, signatureData);
     setSelectedCourse(null);
     setHasAgreed(false);
     setSignatureData(null);
+    setAiSummary(null);
     alert('Ký xác nhận thành công!');
   };
 
@@ -137,7 +163,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ state, onLogout, onSign, 
             
             <div className="grid gap-5">
               {pendingCourses.map((c) => (
-                <div key={c.id} onClick={() => setSelectedCourse(c)} className="bg-white rounded-[2.5rem] p-7 border border-slate-100 shadow-sm active:scale-[0.97] transition-all flex justify-between items-center group overflow-hidden">
+                <div key={c.id} onClick={() => { setSelectedCourse(c); setAiSummary(null); }} className="bg-white rounded-[2.5rem] p-7 border border-slate-100 shadow-sm active:scale-[0.97] transition-all flex justify-between items-center group overflow-hidden">
                   <div className="flex-1 pr-4">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
@@ -213,6 +239,37 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ state, onLogout, onSign, 
               <div className="bg-slate-50 p-7 rounded-[2.5rem] text-slate-700 font-medium text-sm leading-relaxed whitespace-pre-wrap border border-slate-100/50 shadow-inner">
                 {selectedCourse.content}
               </div>
+
+              {/* Gemini AI Summary Section */}
+              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-6 rounded-[2rem] text-white shadow-xl">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">✨</span>
+                    <p className="text-[10px] font-black uppercase tracking-widest">Gemini AI Tóm tắt</p>
+                  </div>
+                  {!aiSummary && !isSummarizing && (
+                    <button 
+                      onClick={() => generateSummary(selectedCourse.content)}
+                      className="text-[9px] font-black uppercase bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-full transition-all"
+                    >
+                      Tạo tóm tắt
+                    </button>
+                  )}
+                </div>
+                {isSummarizing ? (
+                  <div className="flex items-center gap-3 py-2">
+                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                    <p className="text-[10px] font-bold italic opacity-70">Đang tóm tắt nội dung...</p>
+                  </div>
+                ) : aiSummary ? (
+                  <div className="text-[11px] font-bold leading-relaxed whitespace-pre-wrap animate-in fade-in slide-in-from-top-1 duration-500">
+                    {aiSummary}
+                  </div>
+                ) : (
+                  <p className="text-[9px] font-medium opacity-60">Nhấn nút để xem tóm tắt thông minh từ AI giúp bạn nắm bắt nhanh nội dung.</p>
+                )}
+              </div>
+
               <div className="space-y-8">
                 <label className="flex items-start gap-4 p-7 bg-[#0047BB]/5 rounded-[2.5rem] border border-[#0047BB]/10 transition-all cursor-pointer">
                   <div className="relative flex items-center justify-center mt-1">

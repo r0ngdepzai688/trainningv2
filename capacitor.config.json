@@ -1,0 +1,10 @@
+
+{
+  "appId": "com.iqc.training",
+  "appName": "IQC Training Pro",
+  "webDir": ".",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

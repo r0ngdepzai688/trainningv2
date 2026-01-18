@@ -1,18 +1,27 @@
 
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+// Import the functions you need from the SDKs you need
+// Fix: Use default import for Firebase v8 compatibility
+import firebase from "firebase/app";
+import "firebase/auth";
+import "firebase/firestore";
+import "firebase/analytics";
 
-// Chú ý: Đây là cấu hình mẫu. Bạn cần thay thế bằng thông số từ Firebase Console của bạn.
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "iqc-training-pro.firebaseapp.com",
-  projectId: "iqc-training-pro",
-  storageBucket: "iqc-training-pro.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCILzCo5fqyy4XlQaFvoAfev0CETVo4gsA",
+  authDomain: "iqc-training-pro-91dfb.firebaseapp.com",
+  projectId: "iqc-training-pro-91dfb",
+  storageBucket: "iqc-training-pro-91dfb.firebasestorage.app",
+  messagingSenderId: "157719523952",
+  appId: "1:157719523952:web:2a629602335feb9393fab5",
+  measurementId: "G-N6GK34XQZY"
 };
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Initialize Firebase
+// Fix: Use v8 initialization style
+const app = !firebase.apps.length ? firebase.initializeApp(firebaseConfig) : firebase.app();
+const analytics = firebase.analytics();
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+export { app, analytics, db, auth, firebase };

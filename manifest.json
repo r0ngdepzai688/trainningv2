@@ -1,0 +1,22 @@
+
+{
+  "name": "IQC Training Professional",
+  "short_name": "IQC Pro",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#00205B",
+  "theme_color": "#00205B",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3587/3587122.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3587/3587122.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

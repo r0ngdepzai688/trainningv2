@@ -7,25 +7,8 @@ import AdminDashboard from './views/AdminDashboard';
 import UserDashboard from './views/UserDashboard';
 
 // Firebase Imports
-import { db, auth } from './lib/firebase';
-import { 
-  collection, 
-  onSnapshot, 
-  doc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc,
-  query,
-  where,
-  arrayUnion,
-  arrayRemove
-} from "firebase/firestore";
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-  signOut
-} from "firebase/auth";
+// Fix: Import firebase and instances from local config using v8 style
+import { db, auth, firebase } from './lib/firebase';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
@@ -37,12 +20,12 @@ const App: React.FC = () => {
 
   // 1. Theo dõi trạng thái đăng nhập (Auth)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    // Fix: Use the auth instance from our firebase lib and call onAuthStateChanged as a method
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
-        // Tìm thông tin user trong Firestore dựa trên email/id
+        // Find user by email prefix (id)
         const userId = firebaseUser.email?.split('@')[0] || '';
-        // Trong thực tế, bạn sẽ fetch profile từ collection 'users'
-        // Ở bản này, ta tạm thời lấy từ state đã đồng bộ bên dưới
+        // Current user is updated via the real-time snapshot below
       } else {
         setState(prev => ({ ...prev, currentUser: null }));
       }
@@ -53,14 +36,14 @@ const App: React.FC = () => {
 
   // 2. Đồng bộ hóa dữ liệu thời gian thực từ Firestore
   useEffect(() => {
-    // Lắng nghe danh sách Khóa học
-    const unsubCourses = onSnapshot(collection(db, "courses"), (snapshot) => {
+    // Fix: Use v8 collection().onSnapshot style
+    const unsubCourses = db.collection("courses").onSnapshot((snapshot) => {
       const coursesData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Course));
       setState(prev => ({ ...prev, courses: coursesData }));
     });
 
     // Lắng nghe danh sách Nhân sự
-    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+    const unsubUsers = db.collection("users").onSnapshot((snapshot) => {
       const usersData = snapshot.docs.map(doc => doc.data() as User);
       setState(prev => {
         // Cập nhật lại currentUser nếu có thay đổi từ DB
@@ -80,8 +63,8 @@ const App: React.FC = () => {
   const login = async (userId: string, password: string) => {
     try {
       const email = `${userId}@iqc.training`;
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      // Khi login thành công, onAuthStateChanged sẽ tự xử lý
+      // Fix: Use auth.signInWithEmailAndPassword (v8 style)
+      await auth.signInWithEmailAndPassword(email, password);
       const userProfile = state.users.find(u => u.id === userId);
       if (userProfile) {
         setState(prev => ({ ...prev, currentUser: userProfile }));
@@ -96,7 +79,8 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     if (window.confirm("Bạn có chắc chắn muốn đăng xuất?")) {
-      await signOut(auth);
+      // Fix: Use auth.signOut (v8 style)
+      await auth.signOut();
     }
   };
 
@@ -126,15 +110,14 @@ const App: React.FC = () => {
       exceptions: []
     };
 
-    // Lưu vào Firestore
-    await setDoc(doc(db, "courses", courseId), newCourse);
+    // Fix: Use db.collection().doc().set (v8 style)
+    await db.collection("courses").doc(courseId).set(newCourse);
 
-    // Gửi thông báo cho từng user (Cập nhật mảng notifications trong Firestore)
+    // Gửi thông báo cho từng user
     const notification = createNotification(`Khóa học mới: ${newCourse.name}`, 'new_course');
     for (const uid of initialUserIds) {
-      const userRef = doc(db, "users", uid);
-      await updateDoc(userRef, {
-        notifications: arrayUnion(notification)
+      await db.collection("users").doc(uid).update({
+        notifications: firebase.firestore.FieldValue.arrayUnion(notification)
       });
     }
   };
@@ -151,8 +134,8 @@ const App: React.FC = () => {
     const notification = createNotification(`NHẮC NHỞ: Vui lòng ký xác nhận ${course.name}`, 'reminder');
     
     for (const uid of pendingUserIds) {
-      await updateDoc(doc(db, "users", uid), {
-        notifications: arrayUnion(notification)
+      await db.collection("users").doc(uid).update({
+        notifications: firebase.firestore.FieldValue.arrayUnion(notification)
       });
     }
     alert(`Đã gửi nhắc nhở tới ${pendingUserIds.length} nhân viên.`);
@@ -160,28 +143,25 @@ const App: React.FC = () => {
 
   const markNotificationsRead = async () => {
     if (!state.currentUser) return;
-    const userRef = doc(db, "users", state.currentUser.id);
     const updatedNotifs = (state.currentUser.notifications || []).map(n => ({ ...n, isRead: true }));
-    await updateDoc(userRef, { notifications: updatedNotifs });
+    await db.collection("users").doc(state.currentUser.id).update({ notifications: updatedNotifs });
   };
 
   const addUser = async (u: User, manualCourseIds: string[] = []) => {
     try {
       const email = `${u.id}@iqc.training`;
-      // 1. Tạo tài khoản Auth (Nếu chưa có)
-      // Chú ý: Trong thực tế bạn cần xử lý lỗi nếu user đã tồn tại
       try {
-        await createUserWithEmailAndPassword(auth, email, u.password);
-      } catch (e) { /* User might already exist in Auth */ }
+        // Fix: Use auth.createUserWithEmailAndPassword (v8 style)
+        await auth.createUserWithEmailAndPassword(email, u.password);
+      } catch (e) { /* User already exists */ }
 
-      // 2. Lưu profile vào Firestore
-      await setDoc(doc(db, "users", u.id), { ...u, notifications: [] });
+      // Fix: Use db.collection().doc().set (v8 style)
+      await db.collection("users").doc(u.id).set({ ...u, notifications: [] });
 
-      // 3. Gán khóa học hiện có nếu thỏa mãn điều kiện
       for (const course of state.courses) {
         if ((course.target === u.company || manualCourseIds.includes(course.id)) && course.isActive) {
-          await updateDoc(doc(db, "courses", course.id), {
-            assignedUserIds: arrayUnion(u.id)
+          await db.collection("courses").doc(course.id).update({
+            assignedUserIds: firebase.firestore.FieldValue.arrayUnion(u.id)
           });
         }
       }
@@ -203,28 +183,27 @@ const App: React.FC = () => {
       timestamp: new Date().toISOString(),
       signature
     };
-    const courseRef = doc(db, "courses", courseId);
-    await updateDoc(courseRef, {
-      completions: arrayUnion(completion)
+    // Fix: Use FieldValue.arrayUnion (v8 style)
+    await db.collection("courses").doc(courseId).update({
+      completions: firebase.firestore.FieldValue.arrayUnion(completion)
     });
   };
 
-  // --- Các hàm CRUD khác cho Firestore ---
-  const updateCourse = async (c: Course) => await updateDoc(doc(db, "courses", c.id), { ...c });
-  const deleteCourse = async (id: string) => await deleteDoc(doc(db, "courses", id));
+  const updateCourse = async (c: Course) => await db.collection("courses").doc(c.id).update({ ...c });
+  const deleteCourse = async (id: string) => await db.collection("courses").doc(id).delete();
   const toggleCourseActive = async (id: string) => {
     const c = state.courses.find(item => item.id === id);
-    if (c) await updateDoc(doc(db, "courses", id), { isActive: !c.isActive });
+    if (c) await db.collection("courses").doc(id).update({ isActive: !c.isActive });
   };
-  const deleteUser = async (id: string) => await deleteDoc(doc(db, "users", id));
+  const deleteUser = async (id: string) => await db.collection("users").doc(id).delete();
   const addException = async (courseId: string, ex: CourseException) => {
-    await updateDoc(doc(db, "courses", courseId), { exceptions: arrayUnion(ex) });
+    await db.collection("courses").doc(courseId).update({ exceptions: firebase.firestore.FieldValue.arrayUnion(ex) });
   };
   const removeException = async (courseId: string, userId: string) => {
     const c = state.courses.find(item => item.id === courseId);
     if (c) {
       const filtered = (c.exceptions || []).filter(e => e.userId !== userId);
-      await updateDoc(doc(db, "courses", courseId), { exceptions: filtered });
+      await db.collection("courses").doc(courseId).update({ exceptions: filtered });
     }
   };
 
