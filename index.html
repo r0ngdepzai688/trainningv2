@@ -12,9 +12,8 @@
         window.onerror = function(msg, url, line, col, error) {
             var errorMsg = "Lỗi hệ thống: " + msg + "\nTại: " + url + "\nDòng: " + line;
             console.error(errorMsg);
-            // Alert này giúp debug nhanh trên điện thoại
             if (!window.hasAlerted) {
-                alert(errorMsg);
+                console.log("System Error detected");
                 window.hasAlerted = true;
             }
             return false;
@@ -46,7 +45,7 @@
             font-weight: bold;
         }
         #root:empty::after {
-            content: "ĐANG TẢI HỆ THỐNG...";
+            content: "KHỞI CHẠY HỆ THỐNG...";
             letter-spacing: 0.2em;
             font-size: 11px;
             animation: pulse 1.5s infinite;
