@@ -1,60 +1,106 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Course, AppState, Completion, CompanyType, CourseStatus, CourseException, Notification } from './types';
+import { User, Course, AppState, Completion, CourseException, Notification as AppNotification } from './types';
 import { INITIAL_USERS, DEFAULT_PASSWORD } from './constants';
 import Login from './views/Login';
 import AdminDashboard from './views/AdminDashboard';
 import UserDashboard from './views/UserDashboard';
 
+// Firebase Imports
+import { db, auth } from './lib/firebase';
+import { 
+  collection, 
+  onSnapshot, 
+  doc, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc,
+  query,
+  where,
+  arrayUnion,
+  arrayRemove
+} from "firebase/firestore";
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
+} from "firebase/auth";
+
 const App: React.FC = () => {
-  const [state, setState] = useState<AppState>(() => {
-    const saved = localStorage.getItem('iqc_training_data');
-    if (saved) return JSON.parse(saved);
-    return {
-      currentUser: null,
-      courses: [],
-      users: INITIAL_USERS
-    };
+  const [state, setState] = useState<AppState>({
+    currentUser: null,
+    courses: [],
+    users: []
   });
+  const [loading, setLoading] = useState(true);
 
+  // 1. Theo dõi trạng thái đăng nhập (Auth)
   useEffect(() => {
-    localStorage.setItem('iqc_training_data', JSON.stringify(state));
-  }, [state]);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Tìm thông tin user trong Firestore dựa trên email/id
+        const userId = firebaseUser.email?.split('@')[0] || '';
+        // Trong thực tế, bạn sẽ fetch profile từ collection 'users'
+        // Ở bản này, ta tạm thời lấy từ state đã đồng bộ bên dưới
+      } else {
+        setState(prev => ({ ...prev, currentUser: null }));
+      }
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
-  const login = (userId: string, password: string) => {
-    const user = state.users.find(u => u.id === userId && u.password === password);
-    if (user) {
-      setState(prev => ({ ...prev, currentUser: user }));
-      return true;
+  // 2. Đồng bộ hóa dữ liệu thời gian thực từ Firestore
+  useEffect(() => {
+    // Lắng nghe danh sách Khóa học
+    const unsubCourses = onSnapshot(collection(db, "courses"), (snapshot) => {
+      const coursesData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Course));
+      setState(prev => ({ ...prev, courses: coursesData }));
+    });
+
+    // Lắng nghe danh sách Nhân sự
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+      const usersData = snapshot.docs.map(doc => doc.data() as User);
+      setState(prev => {
+        // Cập nhật lại currentUser nếu có thay đổi từ DB
+        const updatedCurrentUser = prev.currentUser 
+          ? usersData.find(u => u.id === prev.currentUser?.id) || prev.currentUser 
+          : null;
+        return { ...prev, users: usersData, currentUser: updatedCurrentUser };
+      });
+    });
+
+    return () => {
+      unsubCourses();
+      unsubUsers();
+    };
+  }, []);
+
+  const login = async (userId: string, password: string) => {
+    try {
+      const email = `${userId}@iqc.training`;
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // Khi login thành công, onAuthStateChanged sẽ tự xử lý
+      const userProfile = state.users.find(u => u.id === userId);
+      if (userProfile) {
+        setState(prev => ({ ...prev, currentUser: userProfile }));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Login failed:", error);
+      return false;
     }
-    return false;
   };
 
-  const logout = () => {
-    setState(prev => ({ ...prev, currentUser: null }));
+  const handleLogout = async () => {
+    if (window.confirm("Bạn có chắc chắn muốn đăng xuất?")) {
+      await signOut(auth);
+    }
   };
 
-  const getCourseStatus = (course: Course, users: User[]): CourseStatus => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const start = new Date(course.start);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(course.end);
-    end.setHours(0, 0, 0, 0);
-    
-    const assignedIds = course.assignedUserIds || [];
-    if (assignedIds.length === 0) return today < start ? 'Plan' : 'Opening';
-
-    const handledCount = course.completions.length + (course.exceptions?.length || 0);
-    const isFinished = handledCount >= assignedIds.length;
-
-    if (isFinished) return 'Finished';
-    if (today < start) return 'Plan';
-    if (today > end) return 'Pending';
-    return 'Opening';
-  };
-
-  const createNotification = (message: string, type: 'new_course' | 'reminder'): Notification => ({
+  const createNotification = (message: string, type: 'new_course' | 'reminder'): AppNotification => ({
     id: Math.random().toString(36).substr(2, 9),
     message,
     timestamp: new Date().toISOString(),
@@ -62,7 +108,8 @@ const App: React.FC = () => {
     type
   });
 
-  const addCourse = (course: Omit<Course, 'id' | 'completions'>) => {
+  const addCourse = async (course: Omit<Course, 'id' | 'completions'>) => {
+    const courseId = Math.random().toString(36).substr(2, 9);
     let initialUserIds = Array.from(new Set(course.assignedUserIds || []));
     
     if (course.target === 'sev' || course.target === 'vendor') {
@@ -73,76 +120,26 @@ const App: React.FC = () => {
 
     const newCourse: Course = {
       ...course,
-      id: Math.random().toString(36).substr(2, 9),
+      id: courseId,
       completions: [],
       assignedUserIds: initialUserIds,
       exceptions: []
     };
 
-    setState(prev => {
-      const notification = createNotification(`Khóa học mới được gán: ${newCourse.name}`, 'new_course');
-      const updatedUsers = prev.users.map(u => {
-        if (initialUserIds.includes(u.id)) {
-          const alreadyNotified = (u.notifications || []).some(n => n.message.includes(newCourse.name));
-          if (!alreadyNotified) {
-            return {
-              ...u,
-              notifications: [notification, ...(u.notifications || [])]
-            };
-          }
-        }
-        return u;
-      });
+    // Lưu vào Firestore
+    await setDoc(doc(db, "courses", courseId), newCourse);
 
-      return {
-        ...prev,
-        courses: [...prev.courses, newCourse],
-        users: updatedUsers,
-        currentUser: prev.currentUser && initialUserIds.includes(prev.currentUser.id) 
-          ? { ...prev.currentUser, notifications: [notification, ...(prev.currentUser.notifications || [])] } 
-          : prev.currentUser
-      };
-    });
+    // Gửi thông báo cho từng user (Cập nhật mảng notifications trong Firestore)
+    const notification = createNotification(`Khóa học mới: ${newCourse.name}`, 'new_course');
+    for (const uid of initialUserIds) {
+      const userRef = doc(db, "users", uid);
+      await updateDoc(userRef, {
+        notifications: arrayUnion(notification)
+      });
+    }
   };
 
-  const bulkAddUsers = (newUsers: User[]) => {
-    setState(prev => {
-      const existingIds = new Set(prev.users.map(u => u.id));
-      const trulyNewUsers = newUsers.filter(u => !existingIds.has(u.id));
-      if (trulyNewUsers.length === 0) return prev;
-      
-      let currentUsers = [...prev.users];
-      let currentCourses = [...prev.courses];
-
-      trulyNewUsers.forEach(user => {
-        let userWithNotifications = { ...user, notifications: user.notifications || [] };
-        
-        currentCourses = currentCourses.map(course => {
-          const status = getCourseStatus(course, currentUsers);
-          const isAutoAssign = (course.target === user.company);
-          const isNotFinished = status !== 'Finished';
-
-          if (isAutoAssign && isNotFinished) {
-            const assignedIds = new Set(course.assignedUserIds || []);
-            if (!assignedIds.has(user.id)) {
-              assignedIds.add(user.id);
-              userWithNotifications.notifications = [
-                createNotification(`Khóa học mới: ${course.name}`, 'new_course'),
-                ...userWithNotifications.notifications
-              ];
-              return { ...course, assignedUserIds: Array.from(assignedIds) };
-            }
-          }
-          return course;
-        });
-        currentUsers.push(userWithNotifications);
-      });
-      
-      return { ...prev, users: currentUsers, courses: currentCourses };
-    });
-  };
-
-  const pushCourseReminders = (courseId: string) => {
+  const pushCourseReminders = async (courseId: string) => {
     const course = state.courses.find(c => c.id === courseId);
     if (!course) return;
 
@@ -151,241 +148,116 @@ const App: React.FC = () => {
     const exceptionIds = new Set((course.exceptions || []).map(e => e.userId));
     const pendingUserIds = [...assignedIds].filter(id => !finishedIds.has(id) && !exceptionIds.has(id));
 
-    if (pendingUserIds.length === 0) {
-      alert("Tất cả nhân viên đã hoàn thành khóa học này!");
-      return;
-    }
-
-    setState(prev => {
-      const notification = createNotification(`Yêu cầu hoàn thành ngay khóa học: ${course.name}`, 'reminder');
-      const updatedUsers = prev.users.map(u => {
-        if (pendingUserIds.includes(u.id)) {
-          return {
-            ...u,
-            notifications: [notification, ...(u.notifications || [])]
-          };
-        }
-        return u;
-      });
-
-      return {
-        ...prev,
-        users: updatedUsers,
-        currentUser: prev.currentUser && pendingUserIds.includes(prev.currentUser.id)
-          ? { ...prev.currentUser, notifications: [notification, ...(prev.currentUser.notifications || [])] }
-          : prev.currentUser
-      };
-    });
-
-    alert(`Đã gửi thông báo nhắc nhở tới ${pendingUserIds.length} nhân viên.`);
-  };
-
-  const markNotificationsRead = () => {
-    if (!state.currentUser) return;
-    const userId = state.currentUser.id;
-    setState(prev => {
-      const updatedUsers = prev.users.map(u => {
-        if (u.id === userId) {
-          return {
-            ...u,
-            notifications: (u.notifications || []).map(n => ({ ...n, isRead: true }))
-          };
-        }
-        return u;
-      });
-      return {
-        ...prev,
-        users: updatedUsers,
-        currentUser: prev.currentUser ? {
-          ...prev.currentUser,
-          notifications: (prev.currentUser.notifications || []).map(n => ({ ...n, isRead: true }))
-        } : null
-      };
-    });
-  };
-
-  const loginAfterRegister = (userData: Omit<User, 'role' | 'password'>) => {
-    const existing = state.users.find(u => u.id === userData.id);
-    if (existing) {
-      setState(prev => ({ ...prev, currentUser: existing }));
-      return;
-    }
-
-    const newUserBase: User = { ...userData, role: 'user', password: DEFAULT_PASSWORD, notifications: [] };
+    const notification = createNotification(`NHẮC NHỞ: Vui lòng ký xác nhận ${course.name}`, 'reminder');
     
-    setState(prev => {
-      let newUser = { ...newUserBase };
-      const newNotifications: Notification[] = [];
-      
-      const updatedCourses = prev.courses.map(course => {
-        const status = getCourseStatus(course, prev.users);
-        const isAutoAssign = (course.target === newUser.company);
-        const isNotFinished = status !== 'Finished';
-
-        if (isAutoAssign && isNotFinished) {
-          const assignedIds = new Set(course.assignedUserIds || []);
-          if (!assignedIds.has(newUser.id)) {
-            assignedIds.add(newUser.id);
-            newNotifications.push(createNotification(`Khóa học mới: ${course.name}`, 'new_course'));
-            return { ...course, assignedUserIds: Array.from(assignedIds) };
-          }
-        }
-        return course;
+    for (const uid of pendingUserIds) {
+      await updateDoc(doc(db, "users", uid), {
+        notifications: arrayUnion(notification)
       });
-
-      newUser.notifications = [...newNotifications, ...(newUser.notifications || [])];
-      
-      return {
-        ...prev,
-        users: [...prev.users, newUser],
-        courses: updatedCourses,
-        currentUser: newUser
-      };
-    });
+    }
+    alert(`Đã gửi nhắc nhở tới ${pendingUserIds.length} nhân viên.`);
   };
 
-  const updateCourse = (updatedCourse: Course) => {
-    setState(prev => ({
-      ...prev,
-      courses: prev.courses.map(c => c.id === updatedCourse.id ? updatedCourse : c)
-    }));
+  const markNotificationsRead = async () => {
+    if (!state.currentUser) return;
+    const userRef = doc(db, "users", state.currentUser.id);
+    const updatedNotifs = (state.currentUser.notifications || []).map(n => ({ ...n, isRead: true }));
+    await updateDoc(userRef, { notifications: updatedNotifs });
   };
 
-  const deleteCourse = (id: string) => {
-    setState(prev => ({
-      ...prev,
-      courses: prev.courses.filter(c => c.id !== id)
-    }));
-  };
+  const addUser = async (u: User, manualCourseIds: string[] = []) => {
+    try {
+      const email = `${u.id}@iqc.training`;
+      // 1. Tạo tài khoản Auth (Nếu chưa có)
+      // Chú ý: Trong thực tế bạn cần xử lý lỗi nếu user đã tồn tại
+      try {
+        await createUserWithEmailAndPassword(auth, email, u.password);
+      } catch (e) { /* User might already exist in Auth */ }
 
-  const toggleCourseActive = (id: string) => {
-    setState(prev => ({
-      ...prev,
-      courses: prev.courses.map(c => id === c.id ? { ...c, isActive: !c.isActive } : c)
-    }));
-  };
+      // 2. Lưu profile vào Firestore
+      await setDoc(doc(db, "users", u.id), { ...u, notifications: [] });
 
-  const addCourseException = (courseId: string, exception: CourseException) => {
-    setState(prev => ({
-      ...prev,
-      courses: prev.courses.map(c => {
-        if (c.id === courseId) {
-          const exceptions = c.exceptions || [];
-          const exists = exceptions.find(e => e.userId === exception.userId);
-          if (exists) {
-            return { ...c, exceptions: exceptions.map(e => e.userId === exception.userId ? exception : e) };
-          }
-          return { ...c, exceptions: [...exceptions, exception] };
+      // 3. Gán khóa học hiện có nếu thỏa mãn điều kiện
+      for (const course of state.courses) {
+        if ((course.target === u.company || manualCourseIds.includes(course.id)) && course.isActive) {
+          await updateDoc(doc(db, "courses", course.id), {
+            assignedUserIds: arrayUnion(u.id)
+          });
         }
-        return c;
-      })
-    }));
+      }
+    } catch (err) {
+      console.error("Error adding user:", err);
+    }
   };
 
-  const removeCourseException = (courseId: string, userId: string) => {
-    setState(prev => ({
-      ...prev,
-      courses: prev.courses.map(c => {
-        if (c.id === courseId) {
-          return { ...c, exceptions: (c.exceptions || []).filter(e => e.userId !== userId) };
-        }
-        return c;
-      })
-    }));
+  const bulkAddUsers = async (newUsers: User[]) => {
+    for (const u of newUsers) {
+      await addUser(u);
+    }
   };
 
-  const signCourse = (courseId: string, signature: string) => {
+  const signCourse = async (courseId: string, signature: string) => {
     if (!state.currentUser) return;
     const completion: Completion = {
       userId: state.currentUser.id,
       timestamp: new Date().toISOString(),
       signature
     };
-    setState(prev => ({
-      ...prev,
-      courses: prev.courses.map(c => {
-        if (c.id === courseId) {
-          const alreadySigned = c.completions.some(comp => comp.userId === completion.userId);
-          if (alreadySigned) return c;
-          return { ...c, completions: [...c.completions, completion] };
-        }
-        return c;
-      })
-    }));
-  };
-
-  const deleteUser = (userId: string) => {
-    setState(prev => ({
-      ...prev,
-      users: prev.users.filter(u => u.id !== userId)
-    }));
-  };
-
-  const addUser = (user: User, manualCourseIds: string[] = []) => {
-    setState(prev => {
-      const existing = prev.users.find(u => u.id === user.id);
-      if (existing) return prev;
-
-      let newUser = { ...user, notifications: user.notifications || [] };
-      const newNotifications: Notification[] = [];
-
-      const updatedCourses = prev.courses.map(course => {
-        const status = getCourseStatus(course, prev.users);
-        const isAutoAssign = (course.target === newUser.company);
-        const isManualAssign = manualCourseIds.includes(course.id);
-        const isNotFinished = status !== 'Finished';
-
-        if ((isAutoAssign || isManualAssign) && isNotFinished) {
-          const assignedIds = new Set(course.assignedUserIds || []);
-          if (!assignedIds.has(newUser.id)) {
-            assignedIds.add(newUser.id);
-            newNotifications.push(createNotification(`Khóa học mới: ${course.name}`, 'new_course'));
-            return { ...course, assignedUserIds: Array.from(assignedIds) };
-          }
-        }
-        return course;
-      });
-
-      newUser.notifications = [...newNotifications, ...(newUser.notifications || [])];
-      
-      return {
-        ...prev,
-        users: [...prev.users, newUser],
-        courses: updatedCourses
-      };
+    const courseRef = doc(db, "courses", courseId);
+    await updateDoc(courseRef, {
+      completions: arrayUnion(completion)
     });
   };
 
-  if (!state.currentUser) {
-    return <Login onLogin={login} onRegister={loginAfterRegister} />;
-  }
+  // --- Các hàm CRUD khác cho Firestore ---
+  const updateCourse = async (c: Course) => await updateDoc(doc(db, "courses", c.id), { ...c });
+  const deleteCourse = async (id: string) => await deleteDoc(doc(db, "courses", id));
+  const toggleCourseActive = async (id: string) => {
+    const c = state.courses.find(item => item.id === id);
+    if (c) await updateDoc(doc(db, "courses", id), { isActive: !c.isActive });
+  };
+  const deleteUser = async (id: string) => await deleteDoc(doc(db, "users", id));
+  const addException = async (courseId: string, ex: CourseException) => {
+    await updateDoc(doc(db, "courses", courseId), { exceptions: arrayUnion(ex) });
+  };
+  const removeException = async (courseId: string, userId: string) => {
+    const c = state.courses.find(item => item.id === courseId);
+    if (c) {
+      const filtered = (c.exceptions || []).filter(e => e.userId !== userId);
+      await updateDoc(doc(db, "courses", courseId), { exceptions: filtered });
+    }
+  };
 
-  if (state.currentUser.role === 'admin') {
+  if (loading) {
     return (
-      <AdminDashboard 
-        state={state} 
-        onLogout={logout} 
-        onAddCourse={addCourse}
-        onBulkAddUsers={bulkAddUsers}
-        onUpdateCourse={updateCourse}
-        onDeleteCourse={deleteCourse}
-        onToggleCourseActive={toggleCourseActive}
-        onDeleteUser={deleteUser}
-        onAddUser={addUser}
-        onAddException={addCourseException}
-        onRemoveException={removeCourseException}
-        onPushReminder={pushCourseReminders}
-      />
+      <div className="h-screen flex items-center justify-center bg-[#00205B]">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white font-bold uppercase tracking-widest text-[10px]">Đang kết nối hệ thống...</p>
+        </div>
+      </div>
     );
   }
 
-  return (
-    <UserDashboard 
+  if (!state.currentUser) return <Login onLogin={login} onRegister={addUser} />;
+
+  return state.currentUser.role === 'admin' ? (
+    <AdminDashboard 
       state={state} 
-      onLogout={logout} 
-      onSign={signCourse}
-      onMarkRead={markNotificationsRead}
+      onLogout={handleLogout} 
+      onAddCourse={addCourse}
+      onBulkAddUsers={bulkAddUsers}
+      onUpdateCourse={updateCourse}
+      onDeleteCourse={deleteCourse}
+      onToggleCourseActive={toggleCourseActive}
+      onDeleteUser={deleteUser}
+      onAddUser={addUser}
+      onAddException={addException}
+      onRemoveException={removeException}
+      onPushReminder={pushCourseReminders}
     />
+  ) : (
+    <UserDashboard state={state} onLogout={handleLogout} onSign={signCourse} onMarkRead={markNotificationsRead} />
   );
 };
 

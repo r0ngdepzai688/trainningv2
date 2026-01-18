@@ -6,14 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#0047BB">
+    <meta name="apple-mobile-web-app-title" content="IQC Pro">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#00205B">
     <title>IQC Training Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Thư viện xlsx-js-style hỗ trợ đọc/ghi file Excel cơ bản và định dạng bảng (Dùng cho Acting Tab & Create Tab) -->
+    <!-- Thư viện xlsx-js-style -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     
-    <!-- Thư viện ExcelJS & FileSaver hỗ trợ chèn hình ảnh chữ ký (Dùng cho Finished Tab) -->
+    <!-- Thư viện ExcelJS & FileSaver -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
@@ -52,13 +54,21 @@
             to { transform: translateY(0); }
         }
         .animate-slide-up { animation: slideUp 0.3s ease-out; }
+        
+        @media (display-mode: standalone) {
+            header { padding-top: 20px; }
+        }
     </style>
 <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/"
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "firebase/app": "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js",
+    "firebase/": "https://esm.sh/firebase@^12.8.0/"
   }
 }
 </script>
