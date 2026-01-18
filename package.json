@@ -1,7 +1,7 @@
 
 {
   "name": "iqc-training-pro",
-  "version": "1.5.0",
+  "version": "1.7.0",
   "description": "Hệ thống xác nhận đào tạo IQC chuyên nghiệp",
   "main": "index.js",
   "dependencies": {
@@ -11,7 +11,7 @@
   },
   "scripts": {
     "clean-www": "if exist www (rmdir /s /q www)",
-    "build-app": "npm run clean-www && mkdir www && xcopy \"index.html\" \"www\\\" /Y && xcopy \"index.tsx\" \"www\\\" /Y && xcopy \"App.tsx\" \"www\\\" /Y && xcopy \"types.ts\" \"www\\\" /Y && xcopy \"constants.tsx\" \"www\\\" /Y && xcopy \"manifest.json\" \"www\\\" /Y && xcopy \"metadata.json\" \"www\\\" /Y && (if exist views xcopy \"views\" \"www\\views\" /E /I /Y) && (if exist components xcopy \"components\" \"www\\components\" /E /I /Y) && (if exist lib xcopy \"lib\" \"www\\lib\" /E /I /Y) && npx @capacitor/cli sync android",
+    "build-app": "npm run clean-www && mkdir www && (if exist \"index.html\" xcopy \"index.html\" \"www\\\" /Y) && (if exist \"index.tsx\" xcopy \"index.tsx\" \"www\\\" /Y) && (if exist \"App.tsx\" xcopy \"App.tsx\" \"www\\\" /Y) && (if exist \"types.ts\" xcopy \"types.ts\" \"www\\\" /Y) && (if exist \"constants.tsx\" xcopy \"constants.tsx\" \"www\\\" /Y) && (if exist \"manifest.json\" xcopy \"manifest.json\" \"www\\\" /Y) && (if exist \"metadata.json\" xcopy \"metadata.json\" \"www\\\" /Y) && (if exist \"views\" xcopy \"views\" \"www\\views\" /E /I /Y) && (if exist \"components\" xcopy \"components\" \"www\\components\" /E /I /Y) && (if exist \"lib\" xcopy \"lib\" \"www\\lib\" /E /I /Y) && (if exist android (npx cap sync android) else (npx cap add android))",
     "open-studio": "npx @capacitor/cli open android",
     "re-add-android": "if exist android (rmdir /s /q android) && npx @capacitor/cli add android"
   },

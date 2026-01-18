@@ -31,6 +31,8 @@
             -webkit-font-smoothing: antialiased;
             overflow-x: hidden;
             overscroll-behavior-y: contain;
+            margin: 0;
+            padding: 0;
         }
         
         .app-title-font {
@@ -55,30 +57,32 @@
             to { transform: translateY(0); }
         }
         .animate-slide-up { animation: slideUp 0.3s ease-out; }
-        
-        @media (display-mode: standalone) {
-            header { padding-top: 20px; }
-        }
     </style>
 <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
+    "react-dom": "https://esm.sh/react-dom@^19.2.3",
+    "react-dom/client": "https://esm.sh/react-dom@^19.2.3/client",
     "firebase/app": "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js",
     "firebase/auth": "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js",
     "firebase/firestore": "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js",
     "firebase/analytics": "https://www.gstatic.com/firebasejs/11.0.2/firebase-analytics.js",
+    "firebase/compat/app": "https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js",
+    "firebase/compat/auth": "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth-compat.js",
+    "firebase/compat/firestore": "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore-compat.js",
+    "firebase/compat/analytics": "https://www.gstatic.com/firebasejs/11.0.2/firebase-analytics-compat.js",
+    "@google/genai": "https://esm.sh/@google/genai@^1.37.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "firebase/": "https://esm.sh/firebase@^12.8.0/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.37.0"
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
 </head>
 <body class="text-slate-800 select-none">
     <div id="root"></div>
-    <!-- Điểm nạp ứng dụng chính -->
+    <!-- Load index.tsx as a module -->
     <script type="module" src="./index.tsx"></script>
 </body>
 </html>
