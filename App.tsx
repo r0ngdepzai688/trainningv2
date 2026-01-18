@@ -116,8 +116,9 @@ const App: React.FC = () => {
     // Gửi thông báo cho từng user
     const notification = createNotification(`Khóa học mới: ${newCourse.name}`, 'new_course');
     for (const uid of initialUserIds) {
-      await db.collection("users").doc(uid).update({
-        notifications: firebase.firestore.FieldValue.arrayUnion(notification)
+      // Fix: Cast uid to string and notification to any to resolve TS 'unknown' assignment issues with Firebase v8 compat
+      await db.collection("users").doc(uid as string).update({
+        notifications: firebase.firestore.FieldValue.arrayUnion(notification as any)
       });
     }
   };
@@ -134,8 +135,9 @@ const App: React.FC = () => {
     const notification = createNotification(`NHẮC NHỞ: Vui lòng ký xác nhận ${course.name}`, 'reminder');
     
     for (const uid of pendingUserIds) {
-      await db.collection("users").doc(uid).update({
-        notifications: firebase.firestore.FieldValue.arrayUnion(notification)
+      // Fix: Cast uid to string and notification to any to resolve TS 'unknown' assignment issues with Firebase v8 compat
+      await db.collection("users").doc(uid as string).update({
+        notifications: firebase.firestore.FieldValue.arrayUnion(notification as any)
       });
     }
     alert(`Đã gửi nhắc nhở tới ${pendingUserIds.length} nhân viên.`);

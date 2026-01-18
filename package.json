@@ -1,19 +1,19 @@
 
 {
   "name": "iqc-training-pro",
-  "version": "1.0.0",
-  "description": "IQC Training Confirmation System",
+  "version": "1.0.1",
+  "description": "IQC Training Professional Confirmation System",
   "main": "index.js",
   "dependencies": {
     "@capacitor/android": "^6.0.0",
     "@capacitor/cli": "^6.0.0",
     "@capacitor/core": "^6.0.0"
   },
-  "devDependencies": {
-    "typescript": "^5.0.0"
-  },
   "scripts": {
-    "build": "mkdir -p www && cp index.html manifest.json www/ && echo 'Build simulated'"
+    "cap:add": "npx cap add android",
+    "cap:sync": "npx cap sync",
+    "cap:open": "npx cap open android",
+    "prepare:www": "mkdir -p www && cp index.html manifest.json www/ && echo 'Đã chuẩn bị thư mục www. Hãy đảm bảo các file JS/TS cũng được copy vào đây.'"
   },
   "author": "IQC Quality Control",
   "license": "ISC"
