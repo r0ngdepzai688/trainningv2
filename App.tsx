@@ -42,11 +42,11 @@ const App: React.FC = () => {
     const end = new Date(course.end);
     end.setHours(0, 0, 0, 0);
     
-    const assignedIds = new Set(course.assignedUserIds || []);
-    const exceptionIds = new Set((course.exceptions || []).map(e => e.userId));
-    
-    const targetUsers = users.filter(u => assignedIds.has(u.id) && !exceptionIds.has(u.id));
-    const isFinished = targetUsers.length > 0 && course.completions.length >= targetUsers.length;
+    const assignedIds = course.assignedUserIds || [];
+    if (assignedIds.length === 0) return today < start ? 'Plan' : 'Opening';
+
+    const handledCount = course.completions.length + (course.exceptions?.length || 0);
+    const isFinished = handledCount >= assignedIds.length;
 
     if (isFinished) return 'Finished';
     if (today < start) return 'Plan';
@@ -63,12 +63,11 @@ const App: React.FC = () => {
   });
 
   const addCourse = (course: Omit<Course, 'id' | 'completions'>) => {
-    // Deduplicate assigned IDs immediately using a Set
     let initialUserIds = Array.from(new Set(course.assignedUserIds || []));
     
-    if (course.target !== 'target') {
+    if (course.target === 'sev' || course.target === 'vendor') {
       initialUserIds = state.users
-        .filter(u => u.company === (course.target as any) && u.role === 'user')
+        .filter(u => u.company === course.target && u.role === 'user')
         .map(u => u.id);
     }
 
@@ -84,7 +83,6 @@ const App: React.FC = () => {
       const notification = createNotification(`Khóa học mới được gán: ${newCourse.name}`, 'new_course');
       const updatedUsers = prev.users.map(u => {
         if (initialUserIds.includes(u.id)) {
-          // Check if this notification already exists (optional safety)
           const alreadyNotified = (u.notifications || []).some(n => n.message.includes(newCourse.name));
           if (!alreadyNotified) {
             return {
@@ -110,15 +108,37 @@ const App: React.FC = () => {
   const bulkAddUsers = (newUsers: User[]) => {
     setState(prev => {
       const existingIds = new Set(prev.users.map(u => u.id));
-      // Only add users whose IDs aren't already in the list
       const trulyNewUsers = newUsers.filter(u => !existingIds.has(u.id));
-      
       if (trulyNewUsers.length === 0) return prev;
       
-      return {
-        ...prev,
-        users: [...prev.users, ...trulyNewUsers]
-      };
+      let currentUsers = [...prev.users];
+      let currentCourses = [...prev.courses];
+
+      trulyNewUsers.forEach(user => {
+        let userWithNotifications = { ...user, notifications: user.notifications || [] };
+        
+        currentCourses = currentCourses.map(course => {
+          const status = getCourseStatus(course, currentUsers);
+          const isAutoAssign = (course.target === user.company);
+          const isNotFinished = status !== 'Finished';
+
+          if (isAutoAssign && isNotFinished) {
+            const assignedIds = new Set(course.assignedUserIds || []);
+            if (!assignedIds.has(user.id)) {
+              assignedIds.add(user.id);
+              userWithNotifications.notifications = [
+                createNotification(`Khóa học mới: ${course.name}`, 'new_course'),
+                ...userWithNotifications.notifications
+              ];
+              return { ...course, assignedUserIds: Array.from(assignedIds) };
+            }
+          }
+          return course;
+        });
+        currentUsers.push(userWithNotifications);
+      });
+      
+      return { ...prev, users: currentUsers, courses: currentCourses };
     });
   };
 
@@ -129,8 +149,6 @@ const App: React.FC = () => {
     const assignedIds = new Set(course.assignedUserIds || []);
     const finishedIds = new Set(course.completions.map(c => c.userId));
     const exceptionIds = new Set((course.exceptions || []).map(e => e.userId));
-
-    // Target users who haven't completed and have no exception
     const pendingUserIds = [...assignedIds].filter(id => !finishedIds.has(id) && !exceptionIds.has(id));
 
     if (pendingUserIds.length === 0) {
@@ -193,12 +211,37 @@ const App: React.FC = () => {
       return;
     }
 
-    const newUser: User = { ...userData, role: 'user', password: DEFAULT_PASSWORD, notifications: [] };
-    setState(prev => ({
-      ...prev,
-      users: [...prev.users, newUser],
-      currentUser: newUser
-    }));
+    const newUserBase: User = { ...userData, role: 'user', password: DEFAULT_PASSWORD, notifications: [] };
+    
+    setState(prev => {
+      let newUser = { ...newUserBase };
+      const newNotifications: Notification[] = [];
+      
+      const updatedCourses = prev.courses.map(course => {
+        const status = getCourseStatus(course, prev.users);
+        const isAutoAssign = (course.target === newUser.company);
+        const isNotFinished = status !== 'Finished';
+
+        if (isAutoAssign && isNotFinished) {
+          const assignedIds = new Set(course.assignedUserIds || []);
+          if (!assignedIds.has(newUser.id)) {
+            assignedIds.add(newUser.id);
+            newNotifications.push(createNotification(`Khóa học mới: ${course.name}`, 'new_course'));
+            return { ...course, assignedUserIds: Array.from(assignedIds) };
+          }
+        }
+        return course;
+      });
+
+      newUser.notifications = [...newNotifications, ...(newUser.notifications || [])];
+      
+      return {
+        ...prev,
+        users: [...prev.users, newUser],
+        courses: updatedCourses,
+        currentUser: newUser
+      };
+    });
   };
 
   const updateCourse = (updatedCourse: Course) => {
@@ -262,7 +305,6 @@ const App: React.FC = () => {
       ...prev,
       courses: prev.courses.map(c => {
         if (c.id === courseId) {
-          // Prevent duplicate signing
           const alreadySigned = c.completions.some(comp => comp.userId === completion.userId);
           if (alreadySigned) return c;
           return { ...c, completions: [...c.completions, completion] };
@@ -279,21 +321,38 @@ const App: React.FC = () => {
     }));
   };
 
-  const addUser = (user: User, assignedCourseIds: string[] = []) => {
+  const addUser = (user: User, manualCourseIds: string[] = []) => {
     setState(prev => {
       const existing = prev.users.find(u => u.id === user.id);
-      const newUsers = existing ? prev.users : [...prev.users, user];
-      
-      const newCourses = prev.courses.map(c => {
-        if (assignedCourseIds.includes(c.id)) {
-          const currentAssigned = c.assignedUserIds || [];
-          if (!currentAssigned.includes(user.id)) {
-            return { ...c, assignedUserIds: [...currentAssigned, user.id] };
+      if (existing) return prev;
+
+      let newUser = { ...user, notifications: user.notifications || [] };
+      const newNotifications: Notification[] = [];
+
+      const updatedCourses = prev.courses.map(course => {
+        const status = getCourseStatus(course, prev.users);
+        const isAutoAssign = (course.target === newUser.company);
+        const isManualAssign = manualCourseIds.includes(course.id);
+        const isNotFinished = status !== 'Finished';
+
+        if ((isAutoAssign || isManualAssign) && isNotFinished) {
+          const assignedIds = new Set(course.assignedUserIds || []);
+          if (!assignedIds.has(newUser.id)) {
+            assignedIds.add(newUser.id);
+            newNotifications.push(createNotification(`Khóa học mới: ${course.name}`, 'new_course'));
+            return { ...course, assignedUserIds: Array.from(assignedIds) };
           }
         }
-        return c;
+        return course;
       });
-      return { ...prev, users: newUsers, courses: newCourses };
+
+      newUser.notifications = [...newNotifications, ...(newUser.notifications || [])];
+      
+      return {
+        ...prev,
+        users: [...prev.users, newUser],
+        courses: updatedCourses
+      };
     });
   };
 

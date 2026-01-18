@@ -17,7 +17,6 @@ const UserManagementTab: React.FC<UserManagementTabProps> = ({ users, courses = 
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Form state
   const [newName, setNewName] = useState('');
   const [newId, setNewId] = useState('');
   const [newPart, setNewPart] = useState('');
@@ -32,9 +31,11 @@ const UserManagementTab: React.FC<UserManagementTabProps> = ({ users, courses = 
     const end = new Date(course.end);
     end.setHours(0, 0, 0, 0);
     
-    const assignedIds = new Set(course.assignedUserIds || []);
-    const targetUsers = users.filter(u => assignedIds.has(u.id));
-    const isFinished = targetUsers.length > 0 && course.completions.length === targetUsers.length;
+    const assignedIds = course.assignedUserIds || [];
+    if (assignedIds.length === 0) return today > end ? 'Finished' : 'Opening';
+
+    const handledCount = course.completions.length + (course.exceptions?.length || 0);
+    const isFinished = handledCount >= assignedIds.length;
 
     if (isFinished || today > end) return 'Finished';
     if (today < start) return 'Plan';
@@ -43,7 +44,6 @@ const UserManagementTab: React.FC<UserManagementTabProps> = ({ users, courses = 
 
   const activeAssignCourses = courses.filter(c => {
     const status = getCourseStatus(c);
-    // LOGIC FIX: Exclude 'Finished' AND exclude 'Target' courses for manual assignment of new users
     return status !== 'Finished' && c.target !== 'target';
   });
 
@@ -269,7 +269,6 @@ const UserManagementTab: React.FC<UserManagementTabProps> = ({ users, courses = 
         </div>
       </div>
 
-      {/* Confirmation Modal for Delete */}
       {userToDelete && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6 z-[300] animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-[2rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300 text-center">
@@ -365,7 +364,6 @@ const UserManagementTab: React.FC<UserManagementTabProps> = ({ users, courses = 
                 />
               </div>
 
-              {/* Assignment Section */}
               <div className="space-y-3 pt-2">
                 <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Gán khóa đào tạo hiện có</p>
                 <div className="grid grid-cols-1 gap-2">
