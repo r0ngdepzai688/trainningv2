@@ -9,9 +9,11 @@
     "@capacitor/cli": "^6.0.0",
     "@capacitor/core": "^6.0.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "mkdir -p www && cp index.html manifest.json www/ && echo 'Build simulated'"
   },
   "author": "IQC Quality Control",
   "license": "ISC"

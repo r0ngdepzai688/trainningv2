@@ -2,6 +2,11 @@
 export type UserRole = 'admin' | 'user';
 export type CompanyType = 'sev' | 'vendor' | 'target';
 
+// Fix Gemini SDK type error: define Base64 globally
+declare global {
+  type Base64 = string;
+}
+
 export interface Notification {
   id: string;
   message: string;

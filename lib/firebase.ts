@@ -1,10 +1,10 @@
 
 // Import the functions you need from the SDKs you need
-// Fix: Use default import for Firebase v8 compatibility
-import firebase from "firebase/app";
-import "firebase/auth";
-import "firebase/firestore";
-import "firebase/analytics";
+// Fix: Use compat imports for Firebase v8 compatibility in a v9+ environment to resolve property access errors
+import firebase from "firebase/compat/app";
+import "firebase/compat/auth";
+import "firebase/compat/firestore";
+import "firebase/compat/analytics";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -18,7 +18,7 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-// Fix: Use v8 initialization style
+// Fix: Use v8 initialization style with the compat layer to support existing app logic
 const app = !firebase.apps.length ? firebase.initializeApp(firebaseConfig) : firebase.app();
 const analytics = firebase.analytics();
 const db = firebase.firestore();
