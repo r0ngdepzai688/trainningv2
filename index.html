@@ -10,20 +10,15 @@
     
     <script>
         window.onerror = function(msg, url, line, col, error) {
-            var errorMsg = "Error: " + msg + "\nURL: " + url + "\nLine: " + line;
+            var errorMsg = "Lỗi: " + msg + "\nTại: " + url + "\nDòng: " + line;
             console.error(errorMsg);
-            setTimeout(function() {
-                if (!document.getElementById('root').innerHTML) {
-                    alert("Ứng dụng gặp lỗi khởi động:\n" + errorMsg);
-                }
-            }, 3000);
+            if (error && error.stack) console.error(error.stack);
             return false;
         };
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -46,9 +41,9 @@
             font-weight: bold;
         }
         #root:empty::after {
-            content: "ĐANG KHỞI TẠO...";
+            content: "KHỞI CHẠY HỆ THỐNG...";
             letter-spacing: 0.2em;
-            font-size: 12px;
+            font-size: 11px;
             animation: pulse 1.5s infinite;
         }
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
@@ -72,7 +67,7 @@
 }
 </script>
 </head>
-<body class="text-slate-800">
+<body>
     <div id="root"></div>
 
     <script type="text/babel" data-type="module" data-presets="react,typescript">
