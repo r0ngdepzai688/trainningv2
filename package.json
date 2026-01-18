@@ -1,8 +1,8 @@
 
 {
   "name": "iqc-training-pro",
-  "version": "1.0.1",
-  "description": "IQC Training Professional Confirmation System",
+  "version": "1.2.0",
+  "description": "Hệ thống xác nhận đào tạo IQC chuyên nghiệp",
   "main": "index.js",
   "dependencies": {
     "@capacitor/android": "^6.0.0",
@@ -10,10 +10,10 @@
     "@capacitor/core": "^6.0.0"
   },
   "scripts": {
-    "cap:add": "npx cap add android",
-    "cap:sync": "npx cap sync",
-    "cap:open": "npx cap open android",
-    "prepare:www": "mkdir -p www && cp index.html manifest.json www/ && echo 'Đã chuẩn bị thư mục www. Hãy đảm bảo các file JS/TS cũng được copy vào đây.'"
+    "clean-www": "if exist www (rmdir /s /q www)",
+    "build-app": "npm run clean-www && mkdir www && xcopy /Y index.html www\\ && xcopy /Y index.tsx www\\ && xcopy /Y App.tsx www\\ && xcopy /Y types.ts www\\ && xcopy /Y constants.tsx www\\ && xcopy /Y manifest.json www\\ && xcopy /Y metadata.json www\\ && xcopy /E /I /Y views www\\views && xcopy /E /I /Y components www\\components && xcopy /E /I /Y lib www\\lib && npx cap sync",
+    "open-studio": "npx cap open android",
+    "re-add-android": "if exist android (rmdir /s /q android) && npx cap add android"
   },
   "author": "IQC Quality Control",
   "license": "ISC"
