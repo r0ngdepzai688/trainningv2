@@ -1,7 +1,7 @@
 
 {
   "name": "iqc-training-pro",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Hệ thống xác nhận đào tạo IQC chuyên nghiệp",
   "main": "index.js",
   "dependencies": {
@@ -11,9 +11,9 @@
   },
   "scripts": {
     "clean-www": "if exist www (rmdir /s /q www)",
-    "build-app": "npm run clean-www && mkdir www && xcopy /Y index.html www\\ && xcopy /Y index.tsx www\\ && xcopy /Y App.tsx www\\ && xcopy /Y types.ts www\\ && xcopy /Y constants.tsx www\\ && xcopy /Y manifest.json www\\ && xcopy /Y metadata.json www\\ && xcopy /E /I /Y views www\\views && xcopy /E /I /Y components www\\components && xcopy /E /I /Y lib www\\lib && npx cap sync",
-    "open-studio": "npx cap open android",
-    "re-add-android": "if exist android (rmdir /s /q android) && npx cap add android"
+    "build-app": "npm run clean-www && mkdir www && xcopy /Y index.html www\\ && xcopy /Y index.tsx www\\ && xcopy /Y App.tsx www\\ && xcopy /Y types.ts www\\ && xcopy /Y constants.tsx www\\ && xcopy /Y manifest.json www\\ && xcopy /Y metadata.json www\\ && xcopy /E /I /Y views www\\views && xcopy /E /I /Y components www\\components && xcopy /E /I /Y lib www\\lib && npx @capacitor/cli sync",
+    "open-studio": "npx @capacitor/cli open android",
+    "re-add-android": "if exist android (rmdir /s /q android) && npx @capacitor/cli add android"
   },
   "author": "IQC Quality Control",
   "license": "ISC"
