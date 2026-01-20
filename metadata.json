@@ -1,21 +1,7 @@
 {
   "name": "IQC Training Pro",
-  "short_name": "IQC Pro",
-  "description": "Hệ thống xác nhận đào tạo điện tử dành cho nhân viên IQC và Vendor.",
-  "icons": [
-    {
-      "src": "https://cdn-icons-png.flaticon.com/512/3587/3587122.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
-  "start_url": ".",
-  "display": "standalone",
-  "background_color": "#00205B",
-  "theme_color": "#00205B",
+  "description": "A professional online training confirmation system for IQC inspectors, featuring automated course assignment, electronic signatures, and comprehensive administrative reporting.",
   "requestFramePermissions": [
-    "camera",
-    "microphone"
+    "camera"
   ]
 }

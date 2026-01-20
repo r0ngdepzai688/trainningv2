@@ -4,78 +4,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#00205B">
-    <link rel="manifest" href="./manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0047BB">
     <title>IQC Training Pro</title>
-    
-    <script>
-        window.onerror = function(msg, url, line, col, error) {
-            var errorMsg = "Lỗi hệ thống: " + msg + "\nTại: " + url + "\nDòng: " + line;
-            console.error(errorMsg);
-            if (!window.hasAlerted) {
-                console.log("System Error detected");
-                window.hasAlerted = true;
-            }
-            return false;
-        };
-    </script>
-
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Thư viện xlsx-js-style hỗ trợ đọc/ghi file Excel cơ bản và định dạng bảng (Dùng cho Acting Tab & Create Tab) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    
+    <!-- Thư viện ExcelJS & FileSaver hỗ trợ chèn hình ảnh chữ ký (Dùng cho Finished Tab) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
     <style>
-        :root { --primary-blue: #0047BB; }
+        :root {
+            --primary-blue: #0047BB;
+        }
         body { 
             font-family: 'Inter', sans-serif; 
-            margin: 0; padding: 0;
-            background-color: #00205B;
-            -webkit-tap-highlight-color: transparent;
+            background-color: #ffffff;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+            overscroll-behavior-y: contain;
         }
-        #root:empty {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            color: white;
-            font-weight: bold;
+        
+        .app-title-font {
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            text-transform: uppercase;
         }
-        #root:empty::after {
-            content: "KHỞI CHẠY HỆ THỐNG...";
-            letter-spacing: 0.2em;
-            font-size: 11px;
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
-    </style>
 
-    <script type="importmap">
+        .safe-area-top { padding-top: env(safe-area-inset-top); }
+        .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+        .mobile-table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #F1F5F9; border-radius: 10px; }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        .animate-slide-up { animation: slideUp 0.3s ease-out; }
+    </style>
+<script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.2.0",
-    "react-dom": "https://esm.sh/react-dom@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-    "@google/genai": "https://esm.sh/@google/genai@1.3.0",
-    "firebase/compat/app": "https://esm.sh/firebase@10.7.1/compat/app",
-    "firebase/compat/auth": "https://esm.sh/firebase@10.7.1/compat/auth",
-    "firebase/compat/firestore": "https://esm.sh/firebase@10.7.1/compat/firestore",
-    "firebase/compat/analytics": "https://esm.sh/firebase@10.7.1/compat/analytics",
+    "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "firebase/": "https://esm.sh/firebase@^12.8.0/"
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
 </head>
-<body>
+<body class="text-slate-800 select-none">
     <div id="root"></div>
-
-    <script type="text/babel" data-type="module" data-presets="react,typescript">
-        import "./index.tsx";
-    </script>
 </body>
 </html>

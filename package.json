@@ -1,20 +1,21 @@
-
 {
   "name": "iqc-training-pro",
-  "version": "1.8.0",
-  "description": "Hệ thống xác nhận đào tạo IQC chuyên nghiệp",
-  "main": "index.js",
-  "dependencies": {
-    "@capacitor/android": "^6.0.0",
-    "@capacitor/cli": "^6.0.0",
-    "@capacitor/core": "^6.0.0"
-  },
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "clean-www": "if exist www (rmdir /s /q www)",
-    "build-app": "npm run clean-www && mkdir www && xcopy \"index.html\" \"www\\\" /Y && xcopy \"index.tsx\" \"www\\\" /Y && xcopy \"App.tsx\" \"www\\\" /Y && xcopy \"types.ts\" \"www\\\" /Y && xcopy \"constants.tsx\" \"www\\\" /Y && xcopy \"manifest.json\" \"www\\\" /Y && xcopy \"metadata.json\" \"www\\\" /Y && (if exist \"views\" xcopy \"views\" \"www\\views\" /E /I /Y) && (if exist \"components\" xcopy \"components\" \"www\\components\" /E /I /Y) && (if exist \"lib\" xcopy \"lib\" \"www\\lib\" /E /I /Y) && (if exist android (npx cap sync android) else (npx cap add android))",
-    "open-studio": "npx @capacitor/cli open android",
-    "re-add-android": "if exist android (rmdir /s /q android) && npx @capacitor/cli add android"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
-  "author": "IQC Quality Control",
-  "license": "ISC"
+  "dependencies": {
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
 }

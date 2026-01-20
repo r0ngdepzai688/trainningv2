@@ -46,68 +46,53 @@ const FinishedCoursesTab: React.FC<FinishedCoursesTabProps> = ({ courses, users 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Báo cáo hoàn thành');
 
-    // Cấu hình Cột
     worksheet.columns = [
-      { key: 'stt', width: 8 },
-      { key: 'name', width: 30 },
-      { key: 'id', width: 22 },
-      { key: 'part', width: 20 },
-      { key: 'group', width: 25 },
-      { key: 'sign', width: 40 }
+      { header: 'STT', key: 'stt', width: 8 },
+      { header: 'HỌ TÊN', key: 'name', width: 25 },
+      { header: 'MÃ NHÂN VIÊN', key: 'id', width: 20 },
+      { header: 'BỘ PHẬN', key: 'part', width: 20 },
+      { header: 'NHÓM', key: 'group', width: 20 },
+      { header: 'CHỮ KÝ / LÝ DO', key: 'sign', width: 30 }
     ];
 
-    // 1. Tiêu đề - Merge căn giữa A1:F1
     const titleRow = worksheet.addRow(['BÁO CÁO KẾT QUẢ ĐÀO TẠO NHÂN VIÊN IQC']);
     worksheet.mergeCells('A1:F1');
-    const titleCell = titleRow.getCell(1);
-    titleCell.font = { size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
-    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0047BB' } };
-    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    titleRow.height = 40;
+    titleRow.getCell(1).font = { size: 16, bold: true, color: { rgb: '0047BB' } };
+    titleRow.getCell(1).alignment = { horizontal: 'center' };
 
-    // 2. Thông tin bài giảng - Merge A:F để nội dung hiển thị hết
-    const infoRows = [
-      ['Khóa học:', course.name],
-      ['Thời gian:', `${course.start} ~ ${course.end}`],
-      ['Nội dung:', course.content],
-      ['Kết quả:', `Đã ký: ${course.completions.length} | Vắng: ${course.exceptions?.length || 0} | Tổng: ${course.assignedUserIds?.length || 0}`],
-      ['Ngày trích xuất:', new Date().toLocaleDateString('vi-VN')]
-    ];
+    worksheet.addRow(['Khóa học:', course.name]);
+    worksheet.addRow(['Thời gian:', `${course.start} ~ ${course.end}`]);
+    worksheet.addRow(['Nội dung:', course.content]);
+    worksheet.addRow(['Ngày xuất:', new Date().toLocaleDateString('vi-VN')]);
+    worksheet.addRow([]); 
 
-    infoRows.forEach((info, idx) => {
-      const row = worksheet.addRow([info[0], info[1]]);
-      worksheet.mergeCells(`B${idx + 2}:F${idx + 2}`);
-      row.getCell(1).font = { bold: true };
-      row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
-      row.getCell(2).alignment = { wrapText: true, vertical: 'middle' };
-      if (info[0] === 'Nội dung:') row.height = 50; else row.height = 25;
+    [2, 3, 4, 5].forEach(r => {
+      worksheet.getRow(r).getCell(1).font = { bold: true };
+      worksheet.mergeCells(`B${r}:F${r}`);
+      worksheet.getRow(r).getCell(2).alignment = { wrapText: true };
     });
+    worksheet.getRow(4).height = 40; 
 
-    worksheet.addRow([]); // Dòng trống spacer
-
-    // 3. Header bảng dữ liệu
-    const headerRowIdx = 8;
+    const headerRowIdx = 7;
     const headerRow = worksheet.getRow(headerRowIdx);
-    headerRow.values = ["STT", "HỌ TÊN", "MÃ NHÂN VIÊN", "BỘ PHẬN", "NHÓM", "XÁC NHẬN / CHỮ KÝ"];
+    headerRow.values = ["STT", "HỌ TÊN", "MÃ NHÂN VIÊN", "BỘ PHẬN", "NHÓM", "XÁC NHẬN / GHI CHÚ"];
     headerRow.eachCell(cell => {
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0047BB' } };
+      cell.font = { bold: true, color: { rgb: 'FFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '0047BB' } };
       cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.alignment = { horizontal: 'center' };
     });
-    headerRow.height = 30;
 
-    // 4. Dữ liệu nhân viên
     let currentRow = headerRowIdx + 1;
     for (const comp of course.completions) {
       const u = users.find(user => user.id === comp.userId);
       if (!u) continue;
 
       const row = worksheet.addRow([currentRow - headerRowIdx, u.name, u.id, u.part, u.group, ""]);
-      row.height = 70; 
+      row.height = 60; 
       row.eachCell(cell => {
         cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
       });
 
       if (comp.signature) {
@@ -116,25 +101,21 @@ const FinishedCoursesTab: React.FC<FinishedCoursesTabProps> = ({ courses, users 
             base64: comp.signature,
             extension: 'png',
           });
-          // Căn chỉnh ảnh vào chính giữa cột F (cột 6)
           worksheet.addImage(imageId, {
-            tl: { col: 5.2, row: currentRow - 0.9 },
-            ext: { width: 140, height: 60 }
+            tl: { col: 5.1, row: currentRow - 0.9 },
+            ext: { width: 120, height: 50 }
           });
         } catch (e) {
-          row.getCell(6).value = "Đã xác nhận";
+          row.getCell(6).value = "Đã ký (Lỗi hiển thị ảnh)";
         }
       }
       currentRow++;
     }
 
-    // 5. Nhân viên vắng mặt (Nếu có)
     if (course.exceptions && course.exceptions.length > 0) {
       const excHeader = worksheet.addRow(['DANH SÁCH NHÂN VIÊN VẮNG MẶT / NGOẠI LỆ']);
       worksheet.mergeCells(`A${currentRow}:F${currentRow}`);
-      excHeader.getCell(1).font = { bold: true, color: { argb: 'FFFF0000' } };
-      excHeader.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
-      excHeader.height = 30;
+      excHeader.getCell(1).font = { bold: true, color: { rgb: 'FF0000' } };
       currentRow++;
 
       for (const ex of course.exceptions) {
@@ -142,10 +123,8 @@ const FinishedCoursesTab: React.FC<FinishedCoursesTabProps> = ({ courses, users 
         const row = worksheet.addRow([currentRow - headerRowIdx, u?.name || 'Unknown', ex.userId, u?.part || 'N/A', u?.group || 'N/A', `LÝ DO: ${ex.reason}`]);
         row.eachCell(cell => {
           cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-          cell.font = { color: { argb: 'FFFF0000' } };
-          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          cell.font = { color: { rgb: 'FF0000' } };
         });
-        row.height = 30;
         currentRow++;
       }
     }
@@ -159,7 +138,7 @@ const FinishedCoursesTab: React.FC<FinishedCoursesTabProps> = ({ courses, users 
       saveAs(new Blob([buffer]), filename);
       const subject = encodeURIComponent(`[HOÀN THÀNH] BÁO CÁO ĐÀO TẠO: ${course.name}`);
       const body = encodeURIComponent(
-        `Kính gửi Quản lý,\n\nKhóa đào tạo "${course.name}" đã hoàn tất.\nTổng kết: ${course.completions.length} người ký, ${course.exceptions?.length || 0} người vắng mặt.\n\nChi tiết báo cáo chuyên nghiệp đã được đính kèm.\n\nTrân trọng!`
+        `Kính gửi,\n\nKhóa học "${course.name}" đã kết thúc.\n- Số lượng hoàn thành: ${course.completions.length}\n- Số lượng vắng mặt: ${course.exceptions?.length || 0}\n\nChi tiết chữ ký và lý do vắng mặt vui lòng xem trong file đính kèm đã được tải xuống máy của bạn.\n\nTrân trọng!`
       );
       window.location.href = `mailto:${targetEmail}?subject=${subject}&body=${body}`;
       setShowEmailModal(false);
@@ -211,7 +190,7 @@ const FinishedCoursesTab: React.FC<FinishedCoursesTabProps> = ({ courses, users 
                   onClick={() => exportExcelReport(c)}
                   className="flex-1 px-4 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
                 >
-                  📥 Tải Excel (Gửi ngay)
+                  📥 Tải Excel
                 </button>
                 <button 
                   onClick={() => { setSelectedCourseForEmail(c); setShowEmailModal(true); }}
@@ -226,7 +205,7 @@ const FinishedCoursesTab: React.FC<FinishedCoursesTabProps> = ({ courses, users 
 
         {finishedCourses.length === 0 && (
           <div className="py-24 text-center">
-            <span className="text-4xl grayscale opacity-30">📂</span>
+            <span className="text-4xl opacity-30">📂</span>
             <p className="text-slate-300 font-bold uppercase text-[11px] tracking-[0.5em] mt-4">No archived data</p>
           </div>
         )}

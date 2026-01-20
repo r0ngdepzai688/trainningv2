@@ -1,90 +1,60 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Course, AppState, Completion, CourseException, Notification as AppNotification } from './types';
+import { User, Course, AppState, Completion, CompanyType, CourseStatus, CourseException, Notification } from './types';
 import { INITIAL_USERS, DEFAULT_PASSWORD } from './constants';
 import Login from './views/Login';
 import AdminDashboard from './views/AdminDashboard';
 import UserDashboard from './views/UserDashboard';
 
-// Firebase Imports
-// Fix: Import firebase and instances from local config using v8 style
-import { db, auth, firebase } from './lib/firebase';
-
 const App: React.FC = () => {
-  const [state, setState] = useState<AppState>({
-    currentUser: null,
-    courses: [],
-    users: []
-  });
-  const [loading, setLoading] = useState(true);
-
-  // 1. Theo dõi trạng thái đăng nhập (Auth)
-  useEffect(() => {
-    // Fix: Use the auth instance from our firebase lib and call onAuthStateChanged as a method
-    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
-      if (firebaseUser) {
-        // Find user by email prefix (id)
-        const userId = firebaseUser.email?.split('@')[0] || '';
-        // Current user is updated via the real-time snapshot below
-      } else {
-        setState(prev => ({ ...prev, currentUser: null }));
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // 2. Đồng bộ hóa dữ liệu thời gian thực từ Firestore
-  useEffect(() => {
-    // Fix: Use v8 collection().onSnapshot style
-    const unsubCourses = db.collection("courses").onSnapshot((snapshot) => {
-      const coursesData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Course));
-      setState(prev => ({ ...prev, courses: coursesData }));
-    });
-
-    // Lắng nghe danh sách Nhân sự
-    const unsubUsers = db.collection("users").onSnapshot((snapshot) => {
-      const usersData = snapshot.docs.map(doc => doc.data() as User);
-      setState(prev => {
-        // Cập nhật lại currentUser nếu có thay đổi từ DB
-        const updatedCurrentUser = prev.currentUser 
-          ? usersData.find(u => u.id === prev.currentUser?.id) || prev.currentUser 
-          : null;
-        return { ...prev, users: usersData, currentUser: updatedCurrentUser };
-      });
-    });
-
-    return () => {
-      unsubCourses();
-      unsubUsers();
+  const [state, setState] = useState<AppState>(() => {
+    const saved = localStorage.getItem('iqc_training_data');
+    if (saved) return JSON.parse(saved);
+    return {
+      currentUser: null,
+      courses: [],
+      users: INITIAL_USERS
     };
-  }, []);
+  });
 
-  const login = async (userId: string, password: string) => {
-    try {
-      const email = `${userId}@iqc.training`;
-      // Fix: Use auth.signInWithEmailAndPassword (v8 style)
-      await auth.signInWithEmailAndPassword(email, password);
-      const userProfile = state.users.find(u => u.id === userId);
-      if (userProfile) {
-        setState(prev => ({ ...prev, currentUser: userProfile }));
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Login failed:", error);
-      return false;
+  useEffect(() => {
+    localStorage.setItem('iqc_training_data', JSON.stringify(state));
+  }, [state]);
+
+  const login = (userId: string, password: string) => {
+    const user = state.users.find(u => u.id === userId && u.password === password);
+    if (user) {
+      setState(prev => ({ ...prev, currentUser: user }));
+      return true;
     }
+    return false;
   };
 
-  const handleLogout = async () => {
-    if (window.confirm("Bạn có chắc chắn muốn đăng xuất?")) {
-      // Fix: Use auth.signOut (v8 style)
-      await auth.signOut();
-    }
+  const logout = () => {
+    setState(prev => ({ ...prev, currentUser: null }));
   };
 
-  const createNotification = (message: string, type: 'new_course' | 'reminder'): AppNotification => ({
+  const getCourseStatus = (course: Course, users: User[]): CourseStatus => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(course.start);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(course.end);
+    end.setHours(0, 0, 0, 0);
+    
+    const assignedIds = course.assignedUserIds || [];
+    if (assignedIds.length === 0) return today < start ? 'Plan' : 'Opening';
+
+    const handledCount = course.completions.length + (course.exceptions?.length || 0);
+    const isFinished = handledCount >= assignedIds.length;
+
+    if (isFinished) return 'Finished';
+    if (today < start) return 'Plan';
+    if (today > end) return 'Pending';
+    return 'Opening';
+  };
+
+  const createNotification = (message: string, type: 'new_course' | 'reminder'): Notification => ({
     id: Math.random().toString(36).substr(2, 9),
     message,
     timestamp: new Date().toISOString(),
@@ -92,8 +62,7 @@ const App: React.FC = () => {
     type
   });
 
-  const addCourse = async (course: Omit<Course, 'id' | 'completions'>) => {
-    const courseId = Math.random().toString(36).substr(2, 9);
+  const addCourse = (course: Omit<Course, 'id' | 'completions'>) => {
     let initialUserIds = Array.from(new Set(course.assignedUserIds || []));
     
     if (course.target === 'sev' || course.target === 'vendor') {
@@ -104,26 +73,76 @@ const App: React.FC = () => {
 
     const newCourse: Course = {
       ...course,
-      id: courseId,
+      id: Math.random().toString(36).substr(2, 9),
       completions: [],
       assignedUserIds: initialUserIds,
       exceptions: []
     };
 
-    // Fix: Use db.collection().doc().set (v8 style)
-    await db.collection("courses").doc(courseId).set(newCourse);
-
-    // Gửi thông báo cho từng user
-    const notification = createNotification(`Khóa học mới: ${newCourse.name}`, 'new_course');
-    for (const uid of initialUserIds) {
-      // Fix: Cast uid to string and notification to any to resolve TS 'unknown' assignment issues with Firebase v8 compat
-      await db.collection("users").doc(uid as string).update({
-        notifications: firebase.firestore.FieldValue.arrayUnion(notification as any)
+    setState(prev => {
+      const notification = createNotification(`Khóa học mới được gán: ${newCourse.name}`, 'new_course');
+      const updatedUsers = prev.users.map(u => {
+        if (initialUserIds.includes(u.id)) {
+          const alreadyNotified = (u.notifications || []).some(n => n.message.includes(newCourse.name));
+          if (!alreadyNotified) {
+            return {
+              ...u,
+              notifications: [notification, ...(u.notifications || [])]
+            };
+          }
+        }
+        return u;
       });
-    }
+
+      return {
+        ...prev,
+        courses: [...prev.courses, newCourse],
+        users: updatedUsers,
+        currentUser: prev.currentUser && initialUserIds.includes(prev.currentUser.id) 
+          ? { ...prev.currentUser, notifications: [notification, ...(prev.currentUser.notifications || [])] } 
+          : prev.currentUser
+      };
+    });
   };
 
-  const pushCourseReminders = async (courseId: string) => {
+  const bulkAddUsers = (newUsers: User[]) => {
+    setState(prev => {
+      const existingIds = new Set(prev.users.map(u => u.id));
+      const trulyNewUsers = newUsers.filter(u => !existingIds.has(u.id));
+      if (trulyNewUsers.length === 0) return prev;
+      
+      let currentUsers = [...prev.users];
+      let currentCourses = [...prev.courses];
+
+      trulyNewUsers.forEach(user => {
+        let userWithNotifications = { ...user, notifications: user.notifications || [] };
+        
+        currentCourses = currentCourses.map(course => {
+          const status = getCourseStatus(course, currentUsers);
+          const isAutoAssign = (course.target === user.company);
+          const isNotFinished = status !== 'Finished';
+
+          if (isAutoAssign && isNotFinished) {
+            const assignedIds = new Set(course.assignedUserIds || []);
+            if (!assignedIds.has(user.id)) {
+              assignedIds.add(user.id);
+              userWithNotifications.notifications = [
+                createNotification(`Khóa học mới: ${course.name}`, 'new_course'),
+                ...userWithNotifications.notifications
+              ];
+              return { ...course, assignedUserIds: Array.from(assignedIds) };
+            }
+          }
+          return course;
+        });
+        currentUsers.push(userWithNotifications);
+      });
+      
+      return { ...prev, users: currentUsers, courses: currentCourses };
+    });
+  };
+
+  const pushCourseReminders = (courseId: string) => {
     const course = state.courses.find(c => c.id === courseId);
     if (!course) return;
 
@@ -132,113 +151,241 @@ const App: React.FC = () => {
     const exceptionIds = new Set((course.exceptions || []).map(e => e.userId));
     const pendingUserIds = [...assignedIds].filter(id => !finishedIds.has(id) && !exceptionIds.has(id));
 
-    const notification = createNotification(`NHẮC NHỞ: Vui lòng ký xác nhận ${course.name}`, 'reminder');
-    
-    for (const uid of pendingUserIds) {
-      // Fix: Cast uid to string and notification to any to resolve TS 'unknown' assignment issues with Firebase v8 compat
-      await db.collection("users").doc(uid as string).update({
-        notifications: firebase.firestore.FieldValue.arrayUnion(notification as any)
-      });
+    if (pendingUserIds.length === 0) {
+      alert("Tất cả nhân viên đã hoàn thành khóa học này!");
+      return;
     }
-    alert(`Đã gửi nhắc nhở tới ${pendingUserIds.length} nhân viên.`);
-  };
 
-  const markNotificationsRead = async () => {
-    if (!state.currentUser) return;
-    const updatedNotifs = (state.currentUser.notifications || []).map(n => ({ ...n, isRead: true }));
-    await db.collection("users").doc(state.currentUser.id).update({ notifications: updatedNotifs });
-  };
-
-  const addUser = async (u: User, manualCourseIds: string[] = []) => {
-    try {
-      const email = `${u.id}@iqc.training`;
-      try {
-        // Fix: Use auth.createUserWithEmailAndPassword (v8 style)
-        await auth.createUserWithEmailAndPassword(email, u.password);
-      } catch (e) { /* User already exists */ }
-
-      // Fix: Use db.collection().doc().set (v8 style)
-      await db.collection("users").doc(u.id).set({ ...u, notifications: [] });
-
-      for (const course of state.courses) {
-        if ((course.target === u.company || manualCourseIds.includes(course.id)) && course.isActive) {
-          await db.collection("courses").doc(course.id).update({
-            assignedUserIds: firebase.firestore.FieldValue.arrayUnion(u.id)
-          });
+    setState(prev => {
+      const notification = createNotification(`Yêu cầu hoàn thành ngay khóa học: ${course.name}`, 'reminder');
+      const updatedUsers = prev.users.map(u => {
+        if (pendingUserIds.includes(u.id)) {
+          return {
+            ...u,
+            notifications: [notification, ...(u.notifications || [])]
+          };
         }
-      }
-    } catch (err) {
-      console.error("Error adding user:", err);
-    }
+        return u;
+      });
+
+      return {
+        ...prev,
+        users: updatedUsers,
+        currentUser: prev.currentUser && pendingUserIds.includes(prev.currentUser.id)
+          ? { ...prev.currentUser, notifications: [notification, ...(prev.currentUser.notifications || [])] }
+          : prev.currentUser
+      };
+    });
+
+    alert(`Đã gửi thông báo nhắc nhở tới ${pendingUserIds.length} nhân viên.`);
   };
 
-  const bulkAddUsers = async (newUsers: User[]) => {
-    for (const u of newUsers) {
-      await addUser(u);
-    }
+  const markNotificationsRead = () => {
+    if (!state.currentUser) return;
+    const userId = state.currentUser.id;
+    setState(prev => {
+      const updatedUsers = prev.users.map(u => {
+        if (u.id === userId) {
+          return {
+            ...u,
+            notifications: (u.notifications || []).map(n => ({ ...n, isRead: true }))
+          };
+        }
+        return u;
+      });
+      return {
+        ...prev,
+        users: updatedUsers,
+        currentUser: prev.currentUser ? {
+          ...prev.currentUser,
+          notifications: (prev.currentUser.notifications || []).map(n => ({ ...n, isRead: true }))
+        } : null
+      };
+    });
   };
 
-  const signCourse = async (courseId: string, signature: string) => {
+  const loginAfterRegister = (userData: Omit<User, 'role' | 'password'>) => {
+    const existing = state.users.find(u => u.id === userData.id);
+    if (existing) {
+      setState(prev => ({ ...prev, currentUser: existing }));
+      return;
+    }
+
+    const newUserBase: User = { ...userData, role: 'user', password: DEFAULT_PASSWORD, notifications: [] };
+    
+    setState(prev => {
+      let newUser = { ...newUserBase };
+      const newNotifications: Notification[] = [];
+      
+      const updatedCourses = prev.courses.map(course => {
+        const status = getCourseStatus(course, prev.users);
+        const isAutoAssign = (course.target === newUser.company);
+        const isNotFinished = status !== 'Finished';
+
+        if (isAutoAssign && isNotFinished) {
+          const assignedIds = new Set(course.assignedUserIds || []);
+          if (!assignedIds.has(newUser.id)) {
+            assignedIds.add(newUser.id);
+            newNotifications.push(createNotification(`Khóa học mới: ${course.name}`, 'new_course'));
+            return { ...course, assignedUserIds: Array.from(assignedIds) };
+          }
+        }
+        return course;
+      });
+
+      newUser.notifications = [...newNotifications, ...(newUser.notifications || [])];
+      
+      return {
+        ...prev,
+        users: [...prev.users, newUser],
+        courses: updatedCourses,
+        currentUser: newUser
+      };
+    });
+  };
+
+  const updateCourse = (updatedCourse: Course) => {
+    setState(prev => ({
+      ...prev,
+      courses: prev.courses.map(c => c.id === updatedCourse.id ? updatedCourse : c)
+    }));
+  };
+
+  const deleteCourse = (id: string) => {
+    setState(prev => ({
+      ...prev,
+      courses: prev.courses.filter(c => c.id !== id)
+    }));
+  };
+
+  const toggleCourseActive = (id: string) => {
+    setState(prev => ({
+      ...prev,
+      courses: prev.courses.map(c => id === c.id ? { ...c, isActive: !c.isActive } : c)
+    }));
+  };
+
+  const addCourseException = (courseId: string, exception: CourseException) => {
+    setState(prev => ({
+      ...prev,
+      courses: prev.courses.map(c => {
+        if (c.id === courseId) {
+          const exceptions = c.exceptions || [];
+          const exists = exceptions.find(e => e.userId === exception.userId);
+          if (exists) {
+            return { ...c, exceptions: exceptions.map(e => e.userId === exception.userId ? exception : e) };
+          }
+          return { ...c, exceptions: [...exceptions, exception] };
+        }
+        return c;
+      })
+    }));
+  };
+
+  const removeCourseException = (courseId: string, userId: string) => {
+    setState(prev => ({
+      ...prev,
+      courses: prev.courses.map(c => {
+        if (c.id === courseId) {
+          return { ...c, exceptions: (c.exceptions || []).filter(e => e.userId !== userId) };
+        }
+        return c;
+      })
+    }));
+  };
+
+  const signCourse = (courseId: string, signature: string) => {
     if (!state.currentUser) return;
     const completion: Completion = {
       userId: state.currentUser.id,
       timestamp: new Date().toISOString(),
       signature
     };
-    // Fix: Use FieldValue.arrayUnion (v8 style)
-    await db.collection("courses").doc(courseId).update({
-      completions: firebase.firestore.FieldValue.arrayUnion(completion)
+    setState(prev => ({
+      ...prev,
+      courses: prev.courses.map(c => {
+        if (c.id === courseId) {
+          const alreadySigned = c.completions.some(comp => comp.userId === completion.userId);
+          if (alreadySigned) return c;
+          return { ...c, completions: [...c.completions, completion] };
+        }
+        return c;
+      })
+    }));
+  };
+
+  const deleteUser = (userId: string) => {
+    setState(prev => ({
+      ...prev,
+      users: prev.users.filter(u => u.id !== userId)
+    }));
+  };
+
+  const addUser = (user: User, manualCourseIds: string[] = []) => {
+    setState(prev => {
+      const existing = prev.users.find(u => u.id === user.id);
+      if (existing) return prev;
+
+      let newUser = { ...user, notifications: user.notifications || [] };
+      const newNotifications: Notification[] = [];
+
+      const updatedCourses = prev.courses.map(course => {
+        const status = getCourseStatus(course, prev.users);
+        const isAutoAssign = (course.target === newUser.company);
+        const isManualAssign = manualCourseIds.includes(course.id);
+        const isNotFinished = status !== 'Finished';
+
+        if ((isAutoAssign || isManualAssign) && isNotFinished) {
+          const assignedIds = new Set(course.assignedUserIds || []);
+          if (!assignedIds.has(newUser.id)) {
+            assignedIds.add(newUser.id);
+            newNotifications.push(createNotification(`Khóa học mới: ${course.name}`, 'new_course'));
+            return { ...course, assignedUserIds: Array.from(assignedIds) };
+          }
+        }
+        return course;
+      });
+
+      newUser.notifications = [...newNotifications, ...(newUser.notifications || [])];
+      
+      return {
+        ...prev,
+        users: [...prev.users, newUser],
+        courses: updatedCourses
+      };
     });
   };
 
-  const updateCourse = async (c: Course) => await db.collection("courses").doc(c.id).update({ ...c });
-  const deleteCourse = async (id: string) => await db.collection("courses").doc(id).delete();
-  const toggleCourseActive = async (id: string) => {
-    const c = state.courses.find(item => item.id === id);
-    if (c) await db.collection("courses").doc(id).update({ isActive: !c.isActive });
-  };
-  const deleteUser = async (id: string) => await db.collection("users").doc(id).delete();
-  const addException = async (courseId: string, ex: CourseException) => {
-    await db.collection("courses").doc(courseId).update({ exceptions: firebase.firestore.FieldValue.arrayUnion(ex) });
-  };
-  const removeException = async (courseId: string, userId: string) => {
-    const c = state.courses.find(item => item.id === courseId);
-    if (c) {
-      const filtered = (c.exceptions || []).filter(e => e.userId !== userId);
-      await db.collection("courses").doc(courseId).update({ exceptions: filtered });
-    }
-  };
+  if (!state.currentUser) {
+    return <Login onLogin={login} onRegister={loginAfterRegister} />;
+  }
 
-  if (loading) {
+  if (state.currentUser.role === 'admin') {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#00205B]">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-white font-bold uppercase tracking-widest text-[10px]">Đang kết nối hệ thống...</p>
-        </div>
-      </div>
+      <AdminDashboard 
+        state={state} 
+        onLogout={logout} 
+        onAddCourse={addCourse}
+        onBulkAddUsers={bulkAddUsers}
+        onUpdateCourse={updateCourse}
+        onDeleteCourse={deleteCourse}
+        onToggleCourseActive={toggleCourseActive}
+        onDeleteUser={deleteUser}
+        onAddUser={addUser}
+        onAddException={addCourseException}
+        onRemoveException={removeCourseException}
+        onPushReminder={pushCourseReminders}
+      />
     );
   }
 
-  if (!state.currentUser) return <Login onLogin={login} onRegister={addUser} />;
-
-  return state.currentUser.role === 'admin' ? (
-    <AdminDashboard 
+  return (
+    <UserDashboard 
       state={state} 
-      onLogout={handleLogout} 
-      onAddCourse={addCourse}
-      onBulkAddUsers={bulkAddUsers}
-      onUpdateCourse={updateCourse}
-      onDeleteCourse={deleteCourse}
-      onToggleCourseActive={toggleCourseActive}
-      onDeleteUser={deleteUser}
-      onAddUser={addUser}
-      onAddException={addException}
-      onRemoveException={removeException}
-      onPushReminder={pushCourseReminders}
+      onLogout={logout} 
+      onSign={signCourse}
+      onMarkRead={markNotificationsRead}
     />
-  ) : (
-    <UserDashboard state={state} onLogout={handleLogout} onSign={signCourse} onMarkRead={markNotificationsRead} />
   );
 };
 
