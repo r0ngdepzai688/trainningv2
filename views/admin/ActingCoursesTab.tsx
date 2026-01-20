@@ -38,7 +38,7 @@ const ActingCoursesTab: React.FC<ActingCoursesTabProps> = ({
     const handledCount = course.completions.length + (course.exceptions?.length || 0);
     const isFinished = handledCount >= assignedIds.length;
 
-    if (isFinished) return 'Closed';
+    if (isFinished) return 'Finished'; // Sử dụng 'Finished' đồng bộ với App.tsx
     if (today < start) return 'Plan';
     if (today > end && !isFinished) return 'Pending';
     return 'Opening';
@@ -63,60 +63,48 @@ const ActingCoursesTab: React.FC<ActingCoursesTabProps> = ({
     return Math.round((handledCount / assignedIds.length) * 100);
   };
 
-  // Helper to apply professional styles
   const applyCellStyle = (cell: any, type: 'title' | 'info' | 'header' | 'data') => {
     if (!cell) return;
-    
     const baseBorder = {
       top: { style: "thin", color: { rgb: "000000" } },
       bottom: { style: "thin", color: { rgb: "000000" } },
       left: { style: "thin", color: { rgb: "000000" } },
       right: { style: "thin", color: { rgb: "000000" } }
     };
-
     cell.s = {
       font: { name: 'Arial', sz: 10, color: { rgb: "000000" } },
       alignment: { vertical: "center", horizontal: "left", wrapText: true },
       border: baseBorder
     };
-
     if (type === 'title') {
       cell.s.font = { name: 'Arial', sz: 16, bold: true, color: { rgb: "0047BB" } };
-      cell.s.border = {}; // No border for top title
+      cell.s.border = {};
     } else if (type === 'info') {
       cell.s.font = { name: 'Arial', sz: 10, italic: true };
-      cell.s.border = {}; // No border for metadata
+      cell.s.border = {};
     } else if (type === 'header') {
       cell.s.font.bold = true;
       cell.s.alignment.horizontal = "center";
-      cell.s.fill = { fgColor: { rgb: "DDEBF7" } }; // Light blue header
-    } else if (type === 'data') {
-      // Default data style
+      cell.s.fill = { fgColor: { rgb: "DDEBF7" } };
     }
-    
     return cell;
   };
 
   const formatWorksheet = (course: Course, unfinished: User[]) => {
     const XLSX = (window as any).XLSX;
-    
     const rows: any[][] = [
       ["BÁO CÁO TỒN ĐỌNG ĐÀO TẠO NHÂN VIÊN IQC"],
       [`Khóa học: ${course.name}`],
       [`Thời gian: ${course.start} ~ ${course.end}`],
       [`Trạng thái: Chưa hoàn thành (${unfinished.length} nhân viên)`],
       [`Ngày trích xuất: ${new Date().toLocaleDateString('vi-VN')}`],
-      [], // Spacer
+      [], 
       ["STT", "HỌ TÊN", "MÃ SỐ / CCCD", "BỘ PHẬN", "NHÓM / CÔNG TY", "TRẠNG THÁI XÁC NHẬN"]
     ];
-
     unfinished.forEach((u, idx) => {
       rows.push([idx + 1, u.name, u.id, u.part, u.group, "CHƯA XÁC NHẬN"]);
     });
-
     const ws = XLSX.utils.aoa_to_sheet(rows);
-
-    // Apply merges
     ws['!merges'] = [
       { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
       { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
@@ -124,26 +112,18 @@ const ActingCoursesTab: React.FC<ActingCoursesTabProps> = ({
       { s: { r: 3, c: 0 }, e: { r: 3, c: 5 } },
       { s: { r: 4, c: 0 }, e: { r: 4, c: 5 } },
     ];
-
-    // Apply Styling to all used cells
     const range = XLSX.utils.decode_range(ws['!ref'] || "A1");
     for (let R = range.s.r; R <= range.e.r; ++R) {
       for (let C = range.s.c; C <= range.e.c; ++C) {
         const addr = XLSX.utils.encode_cell({ r: R, c: C } as any);
         if (!ws[addr]) ws[addr] = { v: "" }; 
-        
         if (R === 0) applyCellStyle(ws[addr], 'title');
         else if (R >= 1 && R <= 4) applyCellStyle(ws[addr], 'info');
         else if (R === 6) applyCellStyle(ws[addr], 'header');
         else if (R > 6) applyCellStyle(ws[addr], 'data');
       }
     }
-
-    // Auto-width
-    ws['!cols'] = [
-      { wch: 6 }, { wch: 25 }, { wch: 18 }, { wch: 20 }, { wch: 25 }, { wch: 25 }
-    ];
-
+    ws['!cols'] = [{ wch: 6 }, { wch: 25 }, { wch: 18 }, { wch: 20 }, { wch: 25 }, { wch: 25 }];
     return ws;
   };
 
@@ -152,12 +132,10 @@ const ActingCoursesTab: React.FC<ActingCoursesTabProps> = ({
       alert("Vui lòng nhập email hợp lệ.");
       return;
     }
-
     const XLSX = (window as any).XLSX;
     const wb = XLSX.utils.book_new();
     let summaryText = "KÍNH GỬI QUÝ BỘ PHẬN/CÔNG TY,\n\nĐây là danh sách tồn đọng đào tạo IQC tính đến hôm nay:\n\n";
     let hasAnyData = false;
-
     activeCourses.forEach(course => {
       const unfinished = getUnfinishedUsers(course);
       if (unfinished.length > 0) {
@@ -168,30 +146,23 @@ const ActingCoursesTab: React.FC<ActingCoursesTabProps> = ({
         XLSX.utils.book_append_sheet(wb, ws, sheetName);
       }
     });
-
     if (!hasAnyData) {
       alert("Tuyệt vời! Hiện tại không có nhân viên nào tồn đọng đào tạo.");
       setShowEmailModal(false);
       return;
     }
-
     const dateStr = new Date().toISOString().split('T')[0];
     const filename = `BAO_CAO_TON_DONG_IQC_${dateStr}.xlsx`;
     XLSX.writeFile(wb, filename);
-
     const subject = encodeURIComponent(`[BÁO CÁO] TỒN ĐỌNG ĐÀO TẠO NHÂN VIÊN IQC - ${dateStr}`);
     const body = encodeURIComponent(
-      summaryText + 
-      "\n--------------------------------------------------\n" +
+      summaryText + "\n--------------------------------------------------\n" +
       "LƯU Ý: File báo cáo Excel chi tiết (có kẻ bảng) đã được tải xuống máy của bạn.\n" +
       "Vui lòng ĐÍNH KÈM file '" + filename + "' vào email này trước khi gửi.\n\n" +
       "Trân trọng,\nIQC Management System"
     );
-
-    alert("File Excel đã được tải xuống máy của bạn.\nHệ thống sẽ mở ứng dụng Email ngay bây giờ, vui lòng đính kèm file vừa tải vào thư.");
-    
+    alert("File Excel đã được tải xuống máy của bạn.\nHệ thống sẽ mở ứng dụng Email ngay bây giờ.");
     window.location.href = `mailto:${targetEmail}?subject=${subject}&body=${body}`;
-    
     setShowEmailModal(false);
     setTargetEmail('');
   };
@@ -230,16 +201,9 @@ const ActingCoursesTab: React.FC<ActingCoursesTabProps> = ({
           <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em]">Active Training List</h3>
           <span className="text-[10px] bg-blue-600 text-white px-3 py-1 rounded-full font-bold shadow-sm">{activeCourses.length} khóa đang chạy</span>
         </div>
-        
-        <button 
-          onClick={() => setShowEmailModal(true)}
-          className="w-full py-4 bg-green-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-green-100 flex items-center justify-center gap-3 active:scale-[0.98] transition-all"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-            <polyline points="22,6 12,13 2,6"></polyline>
-          </svg>
-          Gửi Báo Cáo Qua Email (Có kẻ bảng)
+        <button onClick={() => setShowEmailModal(true)} className="w-full py-4 bg-green-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-green-100 flex items-center justify-center gap-3 active:scale-[0.98] transition-all">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+          Gửi Báo Cáo Tồn Đọng
         </button>
       </div>
 
@@ -248,14 +212,13 @@ const ActingCoursesTab: React.FC<ActingCoursesTabProps> = ({
           const status = getStatus(c);
           const progress = getOverallProgress(c);
           const unfinishedUsers = getUnfinishedUsers(c);
-          const isVendorTarget = c.target === 'vendor';
           
           let statsToDisplay: { label: string, val: number }[] = [];
-          if (isVendorTarget) {
+          if (c.target === 'vendor') {
             const companyCounts: Record<string, number> = {};
             unfinishedUsers.forEach(u => { companyCounts[u.group] = (companyCounts[u.group] || 0) + 1; });
             statsToDisplay = Object.entries(companyCounts).map(([label, val]) => ({ label, val })).sort((a, b) => b.val - a.val);
-          } else {
+          } else if (c.target === 'sev') {
             const parts = ["IQC G", "IQC 1P", "IQC 2P", "IQC 3P", "Injection Innovation Support T/F"];
             const labelsMap: Record<string, string> = { "IQC G": "G", "IQC 1P": "1P", "IQC 2P": "2P", "IQC 3P": "3P", "Injection Innovation Support T/F": "TF" };
             statsToDisplay = parts.map(p => ({ label: labelsMap[p] || p, val: unfinishedUsers.filter(u => u.part === p).length }));
@@ -273,6 +236,9 @@ const ActingCoursesTab: React.FC<ActingCoursesTabProps> = ({
                     }`}>
                       {status}
                     </span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg">
+                      {c.target === 'sev' ? 'SEV' : c.target === 'vendor' ? 'Vendor' : `${c.assignedUserIds?.length || 0} Target`}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={() => onPushReminder(c.id)} className="w-9 h-9 flex items-center justify-center bg-orange-50 text-orange-600 rounded-xl active:bg-orange-600 active:text-white transition-all">🔔</button>
@@ -288,24 +254,27 @@ const ActingCoursesTab: React.FC<ActingCoursesTabProps> = ({
                 <div className="mt-4">
                   <div className="flex justify-between items-center mb-1.5">
                     <span className="text-[10px] font-black text-slate-400 uppercase">Tiến độ ({progress}%)</span>
-                    <span className="text-[10px] font-bold text-slate-900">{c.completions.length + (c.exceptions?.length || 0)} hoàn thành/vắng</span>
+                    <span className="text-[10px] font-bold text-slate-900">{c.completions.length + (c.exceptions?.length || 0)}/{c.assignedUserIds?.length || 0} xử lý</span>
                   </div>
-                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${progress}%` }}></div>
+                  <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-600 rounded-full transition-all duration-700" style={{ width: `${progress}%` }}></div>
                   </div>
                 </div>
               </div>
 
-              <div className="px-7 py-5 bg-slate-50/40 border-y border-slate-50">
-                <div className="flex flex-wrap gap-2.5">
-                  {statsToDisplay.map(s => (
-                    <div key={s.label} className={`flex flex-col items-center justify-center min-w-[50px] flex-1 p-2.5 rounded-2xl border ${s.val > 0 ? 'bg-white border-red-100 shadow-sm' : 'bg-slate-50/50 border-transparent opacity-30'}`}>
-                      <span className="text-[9px] font-black mb-1 uppercase text-slate-400">{s.label}</span>
-                      <span className={`text-sm font-black ${s.val > 0 ? 'text-red-600' : 'text-slate-200'}`}>{s.val}</span>
-                    </div>
-                  ))}
+              {/* Chỉ hiện thống kê bộ phận cho khóa SEV/Vendor để tránh UI cồng kềnh như trong ảnh */}
+              {statsToDisplay.length > 0 && (
+                <div className="px-7 py-5 bg-slate-50/40 border-y border-slate-50">
+                  <div className="flex flex-wrap gap-2.5">
+                    {statsToDisplay.map(s => (
+                      <div key={s.label} className={`flex flex-col items-center justify-center min-w-[50px] flex-1 p-2.5 rounded-2xl border ${s.val > 0 ? 'bg-white border-red-100 shadow-sm' : 'bg-slate-50/50 border-transparent opacity-30'}`}>
+                        <span className="text-[9px] font-black mb-1 uppercase text-slate-400">{s.label}</span>
+                        <span className={`text-sm font-black ${s.val > 0 ? 'text-red-600' : 'text-slate-200'}`}>{s.val}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="p-7 flex items-center justify-between">
                 <button onClick={() => setCourseToDelete(c)} className="w-12 h-12 flex items-center justify-center bg-red-50 text-red-500 rounded-[1.2rem] active:bg-red-500 active:text-white transition-all">
@@ -320,52 +289,26 @@ const ActingCoursesTab: React.FC<ActingCoursesTabProps> = ({
         })}
       </div>
 
-      {/* Email Modal */}
+      {/* Modals... (Giữ nguyên các modal cũ) */}
       {showEmailModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6 z-[500] animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
-            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-            </div>
             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-2 text-center">Gửi Báo Cáo Tồn Đọng</h3>
-            <p className="text-slate-400 text-[10px] font-bold text-center uppercase tracking-widest mb-6 px-4">Báo cáo sẽ được xuất Excel chuyên nghiệp (có kẻ bảng) và gửi tới email:</p>
-            
-            <input 
-              type="email" 
-              value={targetEmail}
-              onChange={(e) => setTargetEmail(e.target.value)}
-              placeholder="nhap-email@samsung.com"
-              className="w-full px-5 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-slate-700 mb-6 transition-all text-center"
-            />
-            
+            <input type="email" value={targetEmail} onChange={(e) => setTargetEmail(e.target.value)} placeholder="nhap-email@samsung.com" className="w-full px-5 py-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none font-bold text-slate-700 mb-6 transition-all text-center" />
             <div className="flex flex-col gap-3">
-              <button 
-                onClick={handleExportAndEmail}
-                className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-lg shadow-blue-100 active:scale-95 transition-all"
-              >
-                Xác nhận & Gửi Mail
-              </button>
-              <button 
-                onClick={() => { setShowEmailModal(false); setTargetEmail(''); }}
-                className="w-full bg-slate-50 text-slate-400 py-4 rounded-2xl font-black uppercase tracking-widest text-[11px]"
-              >
-                Quay lại
-              </button>
+              <button onClick={handleExportAndEmail} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all">Gửi Mail</button>
+              <button onClick={() => setShowEmailModal(false)} className="w-full bg-slate-50 text-slate-400 py-4 rounded-2xl font-black uppercase tracking-widest text-[11px]">Hủy</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Exception Management Modal */}
       {exceptionModalCourse && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-end sm:items-center sm:justify-center p-0 sm:p-4 z-[300] animate-in fade-in duration-200">
           <div className="bg-white w-full sm:max-w-2xl rounded-t-[3rem] sm:rounded-[2.5rem] p-8 shadow-2xl flex flex-col max-h-[90vh] animate-in slide-in-from-bottom duration-300">
              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Quản lý vắng mặt</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{exceptionModalCourse.name}</p>
-                </div>
-                <button onClick={() => { setExceptionModalCourse(null); setSelectedUserForException(null); setAbsenceReason(''); }} className="w-10 h-10 flex items-center justify-center bg-slate-50 text-slate-400 rounded-full">✕</button>
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Quản lý vắng mặt</h3>
+                <button onClick={() => { setExceptionModalCourse(null); setSelectedUserForException(null); }} className="w-10 h-10 flex items-center justify-center bg-slate-50 text-slate-400 rounded-full">✕</button>
              </div>
              <div className="flex-1 overflow-y-auto space-y-8 pb-10">
                 <div className="bg-blue-50/50 p-6 rounded-[2rem] border border-blue-100 space-y-4">
@@ -376,32 +319,24 @@ const ActingCoursesTab: React.FC<ActingCoursesTabProps> = ({
                         {searchUserQuery.length > 0 && searchableUsers.map(u => (
                           <button key={u.id} onClick={() => setSelectedUserForException(u)} className="w-full px-4 py-3 flex justify-between items-center text-left">
                             <div><p className="text-[13px] font-bold text-slate-800">{u.name}</p><p className="text-[10px] text-slate-400">{u.id}</p></div>
-                            <span className="text-blue-500 font-bold">+</span>
                           </button>
                         ))}
                       </div>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="bg-white p-4 rounded-xl border border-blue-200 flex justify-between">
-                        <p className="text-xs font-black">{selectedUserForException.name}</p>
-                        <button onClick={() => setSelectedUserForException(null)} className="text-[10px] text-red-500 font-black">Hủy</button>
-                      </div>
+                      <div className="bg-white p-4 rounded-xl border border-blue-200 flex justify-between"><p className="text-xs font-black">{selectedUserForException.name}</p><button onClick={() => setSelectedUserForException(null)} className="text-[10px] text-red-500 font-black">Hủy</button></div>
                       <input type="text" value={absenceReason} onChange={(e) => setAbsenceReason(e.target.value)} placeholder="Lý do..." className="w-full px-4 py-3.5 rounded-xl border border-blue-200 outline-none text-sm font-medium" />
                       <button onClick={handleAddException} className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-black uppercase text-[10px]">Xác nhận</button>
                     </div>
                   )}
                 </div>
-                {/* List Exceptions */}
                 <div className="space-y-3">
                   {exceptionModalCourse.exceptions?.map(ex => {
                     const u = users.find(user => user.id === ex.userId);
                     return (
-                      <div key={ex.userId} className="flex justify-between items-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                        <div>
-                          <p className="text-xs font-black text-slate-800">{u?.name}</p>
-                          <p className="text-[9px] font-bold text-orange-600 uppercase mt-0.5">{ex.reason}</p>
-                        </div>
+                      <div key={ex.userId} className="flex justify-between items-center p-4 bg-white rounded-2xl border border-slate-100">
+                        <div><p className="text-xs font-black text-slate-800">{u?.name}</p><p className="text-[9px] font-bold text-orange-600 uppercase">{ex.reason}</p></div>
                         <button onClick={() => onRemoveException(exceptionModalCourse.id, ex.userId)} className="text-red-400 font-bold p-2 text-sm">✕</button>
                       </div>
                     );
@@ -412,13 +347,11 @@ const ActingCoursesTab: React.FC<ActingCoursesTabProps> = ({
         </div>
       )}
 
-      {/* Course Delete Confirmation */}
       {courseToDelete && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6 z-[400] animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6 z-[400]">
           <div className="bg-white w-full max-w-sm rounded-[2rem] p-8 shadow-2xl text-center">
              <h3 className="text-lg font-bold text-slate-800 mb-2 uppercase">Xóa khóa học?</h3>
-             <p className="text-slate-500 text-sm mb-8 leading-relaxed">Dữ liệu sẽ không thể khôi phục.</p>
-             <div className="flex flex-col gap-3">
+             <div className="flex flex-col gap-3 mt-8">
                 <button onClick={confirmDeleteCourse} className="w-full bg-red-500 text-white py-4 rounded-2xl font-bold uppercase text-[11px]">Xóa ngay</button>
                 <button onClick={() => setCourseToDelete(null)} className="w-full bg-slate-50 text-slate-400 py-4 rounded-2xl font-bold uppercase text-[11px]">Hủy</button>
              </div>
